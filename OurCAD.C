@@ -63,6 +63,7 @@ double
   finalTime,
   stepSize,
   g,
+  z,
   Yn[MAX_NOS+1][MAX_NOS+2];
 
 /* Resolucao de sistema de equacoes lineares.
@@ -158,17 +159,18 @@ int main(void)
     p=txt+strlen(netlist[ne].nome); /* Inicio dos parametros */
     /* O que e lido depende do tipo */
     if (tipo=='.'){
-      ne--;
       sscanf(p,"%i%lg%5s%i",finalTime,stepSize,method,intSteps); /* Cagamos para UIC */
       order=atoi(method[4]);
+      ne--;
     }
     if (tipo=='L' || tipo=='C'){
       if (quant=sscanf(p,"%10s%10s%lgIC=%lg" ,na,nb,&netlist[ne].valor, &netlist[ne].x)!=4){
           if (quant==3){
-            netlist[ne].x=0;
+            netlist[ne].x=0; /* caso UIC não seja especificada */
           }};
        printf("%s %s %g %g\n",netlist[ne].nome,na,nb,netlist[ne].valor);
-
+      netlist[ne].a=numero(na);
+      netlist[ne].b=numero(nb);
     }
     if (tipo=='R' || tipo=='I' || tipo=='V') {
       sscanf(p,"%10s%10s%lg",na,nb,&netlist[ne].valor);
@@ -261,9 +263,29 @@ int main(void)
     for (j=0; j<=nv+1; j++)
       Yn[i][j]=0;
   }
-  /* Monta estampas */
+  /* Monta estampas */ /* ANTES DE TUDO FAZER ANALISE DE ORDEM 1 COM STEP MENOR QUE O NORMAL PARA ACHAR O V(t0) */
   for (i=1; i<=ne; i++) {
     tipo=netlist[i].nome[0];
+    if(tipo=='L'){                          /* Para ajudar :   j(t0),v(t0) - Fonte de corrente fixa que vai de A -> B */                                                                             /* (∆t/nL(...)) - Resistor (INVERTIDO) 1/R */
+        z=netlist[i].x; /* Atenção aqui; X denota as condições iniciais. Caso não tenha foi SETADO como 0 */
+        g=stepSize/netlist[i].valor; /*divisão de lg por int -MERDA- */      /* 1 - j(t0+∆t) ≈ j(t0) + (∆t/L)v(t0 + ∆t) */
+        Yn[netlist[i].a][netlist[i].a]+=g;                                   /* 2 - j(t0+∆t) ≈ j(t0) + (∆t/2L)(v(t0) + v(t0 + ∆t)) */
+        Yn[netlist[i].b][netlist[i].b]+=g;                                   /* 3 - j(t0+∆t) ≈ j(t0) + (∆t/12L)(8v(t0) - v(t0 - ∆t) + 5v(t0 + ∆t)) */
+        Yn[netlist[i].a][netlist[i].b]-=g;                                   /* 4 - j(t0+∆t) ≈ j(t0) + (∆t/24L)(19v(t0) - 5v(t0 - ∆t) + 3v(t0 + ∆t)+ v(t0 - 2∆t)) */
+        Yn[netlist[i].b][netlist[i].a]-=g;
+        Yn[netlist[i].a][nv+1]-=z; /* Fonte de corrente sendo Adicionada */
+        Yn[netlist[i].b][nv+1]+=z; /* Fonte de corrente sendo Adicionada */
+    }
+    if(tipo=='C'){                          /* Para ajudar :   j(t0),v(t0) - Fonte de corrente fixa que vai de A -> B */                                                                             /* (∆t/nL(...)) - Resistor (INVERTIDO) 1/R */
+        z=(netlist[i].x*(netlist[i].valor/stepSize)); /* Atenção aqui; X denota as condições iniciais. Caso não tenha foi SETADO como 0 */
+        g=netlist[i].valor/stepSize; /*divisão de lg por int -MERDA- */      /* 1 - j(t0+∆t) ≈ j(t0) + (∆t/L)v(t0 + ∆t) */
+        Yn[netlist[i].a][netlist[i].a]+=g;                                   /* 2 - j(t0+∆t) ≈ j(t0) + (∆t/2L)(v(t0) + v(t0 + ∆t)) */
+        Yn[netlist[i].b][netlist[i].b]+=g;                                   /* 3 - j(t0+∆t) ≈ j(t0) + (∆t/12L)(8v(t0) - v(t0 - ∆t) + 5v(t0 + ∆t)) */
+        Yn[netlist[i].a][netlist[i].b]-=g;                                   /* 4 - j(t0+∆t) ≈ j(t0) + (∆t/24L)(19v(t0) - 5v(t0 - ∆t) + 3v(t0 + ∆t)+ v(t0 - 2∆t)) */
+        Yn[netlist[i].b][netlist[i].a]-=g;
+        Yn[netlist[i].a][nv+1]+=z; /* DETALHE PARA O SINAL Fonte de corrente sendo Adicionada */
+        Yn[netlist[i].b][nv+1]-=z; /* DETALHE PARA O SINAL Fonte de corrente sendo Adicionada */
+    }
     if (tipo=='R') {
       g=1/netlist[i].valor;
       Yn[netlist[i].a][netlist[i].a]+=g;
