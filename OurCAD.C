@@ -29,6 +29,7 @@ Os nos podem ser nomes
 #define MAX_NOS 50
 #define TOLG 1e-9
 #define DEBUG
+#define MAX_STEPS 4
 
 typedef struct elemento { /* Elemento do netlist */
   char nome[MAX_NOME];
@@ -39,6 +40,7 @@ typedef struct elemento { /* Elemento do netlist */
 elemento netlist[MAX_ELEM]; /* Netlist */
 
 int
+  useInicialConditions = 2,
   quant,
   intSteps,
   order,
@@ -56,14 +58,17 @@ char
   lista[MAX_NOS+1][MAX_NOME+2], /*Tem que caber jx antes do nome */
   txt[MAX_LINHA+1],
   method[6],
+  uic[10],
   *p;
 FILE *arquivo;
 
 double
+
   finalTime,
   stepSize,
   g,
   z,
+  Ys[MAX_NOS+1][MAX_STEPS+1], /* Essa matriz irá armazenar até no máximo 5 valores passados da analise, mas necessitamos salvar tudo em um arquivo */
   Yn[MAX_NOS+1][MAX_NOS+2];
 
 /* Resolucao de sistema de equacoes lineares.
@@ -131,8 +136,8 @@ int numero(char *nome)
 int main(void)
 {
   system("cls");
-  printf("Programa demonstrativo de analise nodal modificada\n");
-  printf("Por Antonio Carlos M. de Queiroz - acmq@coe.ufrj.br\n");
+  printf("Programa de analise no tempo, pelo metodo de Adams-Molton\n");
+  printf("Por Transões da UFRJ\n");
   printf("Versao %s\n",versao);
  denovo:
   /* Leitura do netlist */
@@ -159,9 +164,11 @@ int main(void)
     p=txt+strlen(netlist[ne].nome); /* Inicio dos parametros */
     /* O que e lido depende do tipo */
     if (tipo=='.'){
-      sscanf(p,"%i%lg%5s%i",finalTime,stepSize,method,intSteps); /* Cagamos para UIC */
-      order=atoi(method[4]);
-      ne--;
+      if (quant=sscanf(p,"%i%lg%5s%i%3s",finalTime,stepSize,method,intSteps,uic)!=5){;
+        useInicialConditions = 1;/* 1 = falso ; 2 = true */
+      }
+    order=atoi(method[4]);
+    ne--;
     }
     if (tipo=='L' || tipo=='C'){
       if (quant=sscanf(p,"%10s%10s%lgIC=%lg" ,na,nb,&netlist[ne].valor, &netlist[ne].x)!=4){
@@ -267,6 +274,7 @@ int main(void)
   for (i=1; i<=ne; i++) {
     tipo=netlist[i].nome[0];
     if(tipo=='L'){                          /* Para ajudar :   j(t0),v(t0) - Fonte de corrente fixa que vai de A -> B */                                                                             /* (∆t/nL(...)) - Resistor (INVERTIDO) 1/R */
+      if(useInicialConditions==1){netlist[i].x = 0}
         z=netlist[i].x; /* Atenção aqui; X denota as condições iniciais. Caso não tenha foi SETADO como 0 */
         g=stepSize/netlist[i].valor; /*divisão de lg por int -MERDA- */      /* 1 - j(t0+∆t) ≈ j(t0) + (∆t/L)v(t0 + ∆t) */
         Yn[netlist[i].a][netlist[i].a]+=g;                                   /* 2 - j(t0+∆t) ≈ j(t0) + (∆t/2L)(v(t0) + v(t0 + ∆t)) */
@@ -275,8 +283,10 @@ int main(void)
         Yn[netlist[i].b][netlist[i].a]-=g;
         Yn[netlist[i].a][nv+1]-=z; /* Fonte de corrente sendo Adicionada */
         Yn[netlist[i].b][nv+1]+=z; /* Fonte de corrente sendo Adicionada */
+      
     }
     if(tipo=='C'){                          /* Para ajudar :   j(t0),v(t0) - Fonte de corrente fixa que vai de A -> B */                                                                             /* (∆t/nL(...)) - Resistor (INVERTIDO) 1/R */
+      if(useInicialConditions==1){netlist[i].x = 0}
         z=(netlist[i].x*(netlist[i].valor/stepSize)); /* Atenção aqui; X denota as condições iniciais. Caso não tenha foi SETADO como 0 */
         g=netlist[i].valor/stepSize; /*divisão de lg por int -MERDA- */      /* 1 - j(t0+∆t) ≈ j(t0) + (∆t/L)v(t0 + ∆t) */
         Yn[netlist[i].a][netlist[i].a]+=g;                                   /* 2 - j(t0+∆t) ≈ j(t0) + (∆t/2L)(v(t0) + v(t0 + ∆t)) */
@@ -385,5 +395,6 @@ int main(void)
   }
   getch();
   return 0;
+  }
 }
 
