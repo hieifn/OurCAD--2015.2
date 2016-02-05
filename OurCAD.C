@@ -2,6 +2,10 @@
 Elementos aceitos e linhas do netlist:
 
 Resistor:  R<nome> <no+> <no-> <resistencia>
+VCCS:      G<nome> <io+> <io-> <vi+> <vi-> <transcond/*
+Elementos aceitos e linhas do netlist:
+
+Resistor:  R<nome> <no+> <no-> <resistencia>
 VCCS:      G<nome> <io+> <io-> <vi+> <vi-> <transcondutancia>
 VCVC:      E<nome> <vo+> <vo-> <vi+> <vi-> <ganho de tensao>
 CCCS:      F<nome> <io+> <io-> <ii+> <ii-> <ganho de corrente>
@@ -137,7 +141,7 @@ int main(void)
 {
   system("cls");
   printf("Programa de analise no tempo, pelo metodo de Adams-Molton\n");
-  printf("Por Transões da UFRJ\n");
+  printf("Por Transões da UFRJ\n"); /*Galera troquem deoois !*/
   printf("Versao %s\n",versao);
  denovo:
   /* Leitura do netlist */
@@ -164,10 +168,10 @@ int main(void)
     p=txt+strlen(netlist[ne].nome); /* Inicio dos parametros */
     /* O que e lido depende do tipo */
     if (tipo=='.'){
-      if (quant=sscanf(p,"%i%lg%5s%i%3s",finalTime,stepSize,method,intSteps,uic)!=5){;
-        useInicialConditions = 1;/* 1 = falso ; 2 = true */
+      if (quant=sscanf(p,"%i%lg%6s%i%3s",finalTime,stepSize,method,intSteps,uic)!=5){;
+        useInicialConditions = 1; /* 1 = Não usar Condições Iniciais ; 2 = Usar Condições Iniciais */
       }
-    order=atoi(method[4]);
+    order=atoi(method+4); /* Tem que ser o 4 pq o 5 é o endOfString ADMO"N"  */
     ne--;
     }
     if (tipo=='L' || tipo=='C'){
@@ -175,11 +179,11 @@ int main(void)
           if (quant==3){
             netlist[ne].x=0; /* caso UIC não seja especificada */
           }};
-       printf("%s %s %g %g\n",netlist[ne].nome,na,nb,netlist[ne].valor);
+       printf("%s %s %s %g\n",netlist[ne].nome,na,nb,netlist[ne].valor);
       netlist[ne].a=numero(na);
       netlist[ne].b=numero(nb);
     }
-    if (tipo=='R' || tipo=='I' || tipo=='V') {
+    else if (tipo=='R' || tipo=='I' || tipo=='V') {
       sscanf(p,"%10s%10s%lg",na,nb,&netlist[ne].valor);
       printf("%s %s %s %g\n",netlist[ne].nome,na,nb,netlist[ne].valor);
       netlist[ne].a=numero(na);
@@ -274,7 +278,7 @@ int main(void)
   for (i=1; i<=ne; i++) {
     tipo=netlist[i].nome[0];
     if(tipo=='L'){                          /* Para ajudar :   j(t0),v(t0) - Fonte de corrente fixa que vai de A -> B */                                                                             /* (∆t/nL(...)) - Resistor (INVERTIDO) 1/R */
-      if(useInicialConditions==1){netlist[i].x = 0}
+      if(useInicialConditions==1){netlist[i].x = 0;}
         z=netlist[i].x; /* Atenção aqui; X denota as condições iniciais. Caso não tenha foi SETADO como 0 */
         g=stepSize/netlist[i].valor; /*divisão de lg por int -MERDA- */      /* 1 - j(t0+∆t) ≈ j(t0) + (∆t/L)v(t0 + ∆t) */
         Yn[netlist[i].a][netlist[i].a]+=g;                                   /* 2 - j(t0+∆t) ≈ j(t0) + (∆t/2L)(v(t0) + v(t0 + ∆t)) */
@@ -283,10 +287,10 @@ int main(void)
         Yn[netlist[i].b][netlist[i].a]-=g;
         Yn[netlist[i].a][nv+1]-=z; /* Fonte de corrente sendo Adicionada */
         Yn[netlist[i].b][nv+1]+=z; /* Fonte de corrente sendo Adicionada */
-      
+
     }
     if(tipo=='C'){                          /* Para ajudar :   j(t0),v(t0) - Fonte de corrente fixa que vai de A -> B */                                                                             /* (∆t/nL(...)) - Resistor (INVERTIDO) 1/R */
-      if(useInicialConditions==1){netlist[i].x = 0}
+      if(useInicialConditions==1){netlist[i].x = 0;}
         z=(netlist[i].x*(netlist[i].valor/stepSize)); /* Atenção aqui; X denota as condições iniciais. Caso não tenha foi SETADO como 0 */
         g=netlist[i].valor/stepSize; /*divisão de lg por int -MERDA- */      /* 1 - j(t0+∆t) ≈ j(t0) + (∆t/L)v(t0 + ∆t) */
         Yn[netlist[i].a][netlist[i].a]+=g;                                   /* 2 - j(t0+∆t) ≈ j(t0) + (∆t/2L)(v(t0) + v(t0 + ∆t)) */
@@ -395,6 +399,5 @@ int main(void)
   }
   getch();
   return 0;
-  }
 }
 
