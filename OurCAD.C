@@ -2,10 +2,6 @@
 Elementos aceitos e linhas do netlist:
 
 Resistor:  R<nome> <no+> <no-> <resistencia>
-VCCS:      G<nome> <io+> <io-> <vi+> <vi-> <transcond/*
-Elementos aceitos e linhas do netlist:
-
-Resistor:  R<nome> <no+> <no-> <resistencia>
 VCCS:      G<nome> <io+> <io-> <vi+> <vi-> <transcondutancia>
 VCVC:      E<nome> <vo+> <vo-> <vi+> <vi-> <ganho de tensao>
 CCCS:      F<nome> <io+> <io-> <ii+> <ii-> <ganho de corrente>
@@ -168,18 +164,19 @@ int main(void)
     p=txt+strlen(netlist[ne].nome); /* Inicio dos parametros */
     /* O que e lido depende do tipo */
     if (tipo=='.'){
-      if (quant=sscanf(p,"%i%lg%6s%i%3s",finalTime,stepSize,method,intSteps,uic)!=5){;
+      if (quant=sscanf(p,"%lg%lg%6s%i%4s",&finalTime,&stepSize,method,&intSteps,uic)!=5){
         useInicialConditions = 1; /* 1 = Não usar Condições Iniciais ; 2 = Usar Condições Iniciais */
       }
+    printf("%lg %lg %s %i %s\n",finalTime,stepSize,method,intSteps,uic);/* Debug - Igor */
     order=atoi(method+4); /* Tem que ser o 4 pq o 5 é o endOfString ADMO"N"  */
     ne--;
     }
-    if (tipo=='L' || tipo=='C'){
+    else if (tipo=='L' || tipo=='C'){
       if (quant=sscanf(p,"%10s%10s%lgIC=%lg" ,na,nb,&netlist[ne].valor, &netlist[ne].x)!=4){
           if (quant==3){
             netlist[ne].x=0; /* caso UIC não seja especificada */
           }};
-       printf("%s %s %s %g\n",netlist[ne].nome,na,nb,netlist[ne].valor);
+      printf("%s %s %s %g\n",netlist[ne].nome,na,nb,netlist[ne].valor);
       netlist[ne].a=numero(na);
       netlist[ne].b=numero(nb);
     }
