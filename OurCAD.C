@@ -9,7 +9,8 @@ CCVS:      H<nome> <vo+> <vo-> <ii+> <ii-> <transresistencia>
 Fonte I:   I<nome> <io+> <io-> <corrente>
 Fonte V:   V<nome> <vo+> <vo-> <tensao>
 Amp. op.:  O<nome> <vo1> <vo2> <vi1> <vi2>
-Indutor:   L<nome> <no+> <no-> <indutancia> [IC]
+Indutor:   L<nome> <no+> <no-> <indutancia> [Corrente Inicial]
+Capacitor: C<nome> <no+> <no-> <Capacitância> [Tensão Inicial]
 
 As fontes F e H tem o ramo de entrada em curto
 O amplificador operacional ideal tem a saida suspensa
@@ -28,12 +29,13 @@ Os nos podem ser nomes
 #define MAX_ELEM 50
 #define MAX_NOS 50
 #define TOLG 1e-9
+#define TOLG2 3e-2
 #define DEBUG
 #define MAX_STEPS 4
 
 typedef struct elemento { /* Elemento do netlist */
   char nome[MAX_NOME];
-  double valor;
+  double valor,ini;
   int a,b,c,d,x,y;
 } elemento;
 
@@ -63,7 +65,7 @@ char
 FILE *arquivo;
 
 double
-
+  iStepSize= TOLG2,
   finalTime,
   stepSize,
   g,
@@ -164,19 +166,18 @@ int main(void)
     p=txt+strlen(netlist[ne].nome); /* Inicio dos parametros */
     /* O que e lido depende do tipo */
     if (tipo=='.'){
-      if (quant=sscanf(p,"%lg%lg%6s%i%4s",&finalTime,&stepSize,method,&intSteps,uic)!=5){
+      if ((quant=sscanf(p,"%lg%lg%6s%i%4s",&finalTime,&stepSize,method,&intSteps,uic))!=5){
         useInicialConditions = 1; /* 1 = Não usar Condições Iniciais ; 2 = Usar Condições Iniciais */
       }
-    printf("%lg %lg %s %i %s\n",finalTime,stepSize,method,intSteps,uic);/* Debug - Igor */
+    printf("%lg %lg %s %i %s quant=%i\n",finalTime,stepSize,method,intSteps,uic,quant);/* Debug - Igor */
     order=atoi(method+4); /* Tem que ser o 4 pq o 5 é o endOfString ADMO"N"  */
     ne--;
     }
     else if (tipo=='L' || tipo=='C'){
-      if (quant=sscanf(p,"%10s%10s%lgIC=%lg" ,na,nb,&netlist[ne].valor, &netlist[ne].x)!=4){
-          if (quant==3){
-            netlist[ne].x=0; /* caso UIC não seja especificada */
-          }};
-      printf("%s %s %s %g\n",netlist[ne].nome,na,nb,netlist[ne].valor);
+      if ((quant=sscanf(p,"%10s%10s%lg IC=%lg" ,na,nb,&netlist[ne].valor, &netlist[ne].ini))!=4){
+        netlist[ne].ini=0; /* caso UIC não seja especificada */
+      };
+      printf("%s %s %s %g %g quant =%i\n",netlist[ne].nome,na,nb,netlist[ne].valor,netlist[ne].ini,quant);
       netlist[ne].a=numero(na);
       netlist[ne].b=numero(nb);
     }
@@ -227,6 +228,16 @@ int main(void)
       strcat(lista[nv],netlist[i].nome);
       netlist[i].x=nv;
     }
+    else if (tipo=='L'){
+      nv++;
+      if (nv>MAX_NOS) {
+        printf("As correntes extra excederam o numero de variaveis permitido (%d)\n",MAX_NOS);
+        exit(1);
+      }
+      strcpy(lista[nv],"j"); /* Tem espaco para mais dois caracteres */
+      strcat(lista[nv],netlist[i].nome);
+      netlist[i].x=nv;
+    }
     else if (tipo=='H') {
       nv=nv+2;
       if (nv>MAX_NOS) {
@@ -251,16 +262,24 @@ int main(void)
     if (tipo=='R' || tipo=='I' || tipo=='V') {
       printf("%s %d %d %g\n",netlist[i].nome,netlist[i].a,netlist[i].b,netlist[i].valor);
     }
+    else if (tipo=='C' || tipo=='L'){
+      printf("%s %d %d %g IC = %g\n",netlist[i].nome,netlist[i].a,netlist[i].b,netlist[i].valor,netlist[i].ini);
+    }
     else if (tipo=='G' || tipo=='E' || tipo=='F' || tipo=='H') {
       printf("%s %d %d %d %d %g\n",netlist[i].nome,netlist[i].a,netlist[i].b,netlist[i].c,netlist[i].d,netlist[i].valor);
     }
     else if (tipo=='O') {
       printf("%s %d %d %d %d\n",netlist[i].nome,netlist[i].a,netlist[i].b,netlist[i].c,netlist[i].d);
     }
-    if (tipo=='V' || tipo=='E' || tipo=='F' || tipo=='O')
+    if (tipo=='V' || tipo=='E' || tipo=='F' || tipo=='O'){
       printf("Corrente jx: %d\n",netlist[i].x);
-    else if (tipo=='H')
-      printf("Correntes jx e jy: %d, %d\n",netlist[i].x,netlist[i].y);
+      }
+    else if (tipo=='L'){
+      printf("Corrente %s: %d\n",lista[netlist[i].x],netlist[i].x);
+    }
+    else if (tipo=='H'){
+      printf("Correntes %s: %d e %s: %d\n",lista[netlist[i].x],netlist[i].x,lista[netlist[i].y],netlist[i].y);
+    }
   }
   getch();
   /* Monta o sistema nodal modificado */
@@ -275,29 +294,28 @@ int main(void)
   for (i=1; i<=ne; i++) {
     tipo=netlist[i].nome[0];
     if(tipo=='L'){                          /* Para ajudar :   j(t0),v(t0) - Fonte de corrente fixa que vai de A -> B */                                                                             /* (∆t/nL(...)) - Resistor (INVERTIDO) 1/R */
-      if(useInicialConditions==1){netlist[i].x = 0;}
-        z=netlist[i].x; /* Atenção aqui; X denota as condições iniciais. Caso não tenha foi SETADO como 0 */
-        g=stepSize/netlist[i].valor; /*divisão de lg por int -MERDA- */      /* 1 - j(t0+∆t) ≈ j(t0) + (∆t/L)v(t0 + ∆t) */
-        Yn[netlist[i].a][netlist[i].a]+=g;                                   /* 2 - j(t0+∆t) ≈ j(t0) + (∆t/2L)(v(t0) + v(t0 + ∆t)) */
-        Yn[netlist[i].b][netlist[i].b]+=g;                                   /* 3 - j(t0+∆t) ≈ j(t0) + (∆t/12L)(8v(t0) - v(t0 - ∆t) + 5v(t0 + ∆t)) */
-        Yn[netlist[i].a][netlist[i].b]-=g;                                   /* 4 - j(t0+∆t) ≈ j(t0) + (∆t/24L)(19v(t0) - 5v(t0 - ∆t) + 3v(t0 + ∆t)+ v(t0 - 2∆t)) */
-        Yn[netlist[i].b][netlist[i].a]-=g;
-        Yn[netlist[i].a][nv+1]-=z; /* Fonte de corrente sendo Adicionada */
-        Yn[netlist[i].b][nv+1]+=z; /* Fonte de corrente sendo Adicionada */
-
+      if(useInicialConditions==1){netlist[i].ini = 0;}
+        z=netlist[i].ini; /* Atenção aqui; X denota as condições iniciais. Caso não tenha foi SETADO como 0 */
+        g=iStepSize/netlist[i].valor; /* iStpeSize - StepSize inicial para começar a analise */  /* 1 - j(t0+∆t) ≈ j(t0) + (∆t/L)v(t0 + ∆t) */
+        Yn[netlist[i].a][netlist[i].x]+=1;                                   /* 2 - j(t0+∆t) ≈ j(t0) + (∆t/2L)(v(t0) + v(t0 + ∆t)) */
+        Yn[netlist[i].b][netlist[i].x]-=1;                                   /* 3 - j(t0+∆t) ≈ j(t0) + (∆t/12L)(8v(t0) - v(t0 - ∆t) + 5v(t0 + ∆t)) */
+        Yn[netlist[i].x][netlist[i].a]-=1;                                   /* 4 - j(t0+∆t) ≈ j(t0) + (∆t/24L)(19v(t0) - 5v(t0 - ∆t) + 3v(t0 + ∆t)+ v(t0 - 2∆t)) */
+        Yn[netlist[i].x][netlist[i].b]+=1;
+        Yn[netlist[i].x][netlist[i].x]+=g;
+        Yn[netlist[i].x][nv+1]+=z;          /* Fonte de corrente sendo Adicionada */
     }
-    if(tipo=='C'){                          /* Para ajudar :   j(t0),v(t0) - Fonte de corrente fixa que vai de A -> B */                                                                             /* (∆t/nL(...)) - Resistor (INVERTIDO) 1/R */
-      if(useInicialConditions==1){netlist[i].x = 0;}
-        z=(netlist[i].x*(netlist[i].valor/stepSize)); /* Atenção aqui; X denota as condições iniciais. Caso não tenha foi SETADO como 0 */
-        g=netlist[i].valor/stepSize; /*divisão de lg por int -MERDA- */      /* 1 - j(t0+∆t) ≈ j(t0) + (∆t/L)v(t0 + ∆t) */
-        Yn[netlist[i].a][netlist[i].a]+=g;                                   /* 2 - j(t0+∆t) ≈ j(t0) + (∆t/2L)(v(t0) + v(t0 + ∆t)) */
-        Yn[netlist[i].b][netlist[i].b]+=g;                                   /* 3 - j(t0+∆t) ≈ j(t0) + (∆t/12L)(8v(t0) - v(t0 - ∆t) + 5v(t0 + ∆t)) */
-        Yn[netlist[i].a][netlist[i].b]-=g;                                   /* 4 - j(t0+∆t) ≈ j(t0) + (∆t/24L)(19v(t0) - 5v(t0 - ∆t) + 3v(t0 + ∆t)+ v(t0 - 2∆t)) */
+    else if(tipo=='C'){                          /* Para ajudar :   j(t0),v(t0) - Fonte de corrente fixa que vai de A -> B */                                                                             /* (∆t/nL(...)) - Resistor (INVERTIDO) 1/R */
+      if(useInicialConditions==1){netlist[i].ini = 0;}   /* iStpeSize - StepSize inicial para começar a analise */
+        z=(netlist[i].ini*(netlist[i].valor/iStepSize)); /* iStpeSize - StepSize inicial para começar a analise */
+        g=(netlist[i].valor/iStepSize);
+        Yn[netlist[i].a][netlist[i].a]+=g;
+        Yn[netlist[i].b][netlist[i].b]+=g;
+        Yn[netlist[i].a][netlist[i].b]-=g;
         Yn[netlist[i].b][netlist[i].a]-=g;
         Yn[netlist[i].a][nv+1]+=z; /* DETALHE PARA O SINAL Fonte de corrente sendo Adicionada */
         Yn[netlist[i].b][nv+1]-=z; /* DETALHE PARA O SINAL Fonte de corrente sendo Adicionada */
     }
-    if (tipo=='R') {
+    else if (tipo=='R') {
       g=1/netlist[i].valor;
       Yn[netlist[i].a][netlist[i].a]+=g;
       Yn[netlist[i].b][netlist[i].b]+=g;
