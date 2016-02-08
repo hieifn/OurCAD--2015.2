@@ -169,7 +169,11 @@ int main(void)
       if ((quant=sscanf(p,"%lg%lg%6s%i%4s",&finalTime,&stepSize,method,&intSteps,uic))!=5){
         useInicialConditions = 1; /* 1 = Não usar Condições Iniciais ; 2 = Usar Condições Iniciais */
       }
-    printf("%lg %lg %s %i %s quant=%i\n",finalTime,stepSize,method,intSteps,uic,quant);/* Debug - Igor */
+    
+    #ifdef DEBUG  
+    printf("%lg %lg %s %i %s quant=%i\n",finalTime,stepSize,method,intSteps,uic,quant);     /* Debug - Igor ;)  */
+    #endif
+    
     order=atoi(method+4); /* Tem que ser o 4 pq o 5 é o endOfString ADMO"N"  */
     ne--;
     }
@@ -218,7 +222,7 @@ int main(void)
   nn=nv;
   for (i=1; i<=ne; i++) {
     tipo=netlist[i].nome[0];
-    if (tipo=='V' || tipo=='E' || tipo=='F' || tipo=='O') {
+    if (tipo=='V' || tipo=='E' || tipo=='F' || tipo=='O' || tipo=='L') {
       nv++;
       if (nv>MAX_NOS) {
         printf("As correntes extra excederam o numero de variaveis permitido (%d)\n",MAX_NOS);
@@ -228,16 +232,10 @@ int main(void)
       strcat(lista[nv],netlist[i].nome);
       netlist[i].x=nv;
     }
-    else if (tipo=='L'){
-      nv++;
-      if (nv>MAX_NOS) {
-        printf("As correntes extra excederam o numero de variaveis permitido (%d)\n",MAX_NOS);
-        exit(1);
-      }
-      strcpy(lista[nv],"j"); /* Tem espaco para mais dois caracteres */
-      strcat(lista[nv],netlist[i].nome);
-      netlist[i].x=nv;
-    }
+    /* Retirei o Else if que estava só para o L e juntei com o acima,
+    dos outros elementos que tem variáveis de corrente adicionadas
+    de forma igual  */
+    
     else if (tipo=='H') {
       nv=nv+2;
       if (nv>MAX_NOS) {
