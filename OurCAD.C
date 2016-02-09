@@ -31,7 +31,7 @@ Os nos podem ser nomes
 #define TOLG 1e-9
 #define TOLG2 3e-2
 #define DEBUG
-#define MAX_STEPS 4
+#define MAX_STEPS 3
 
 typedef struct elemento { /* Elemento do netlist */
   char nome[MAX_NOME];
@@ -46,6 +46,7 @@ int
   quant,
   intSteps,
   order,
+  time = 2, /* variavel para armazenamento  */
   ne, /* Elementos */
   nv, /* Variaveis */
   nn, /* Nos */
@@ -70,7 +71,7 @@ double
   stepSize,
   g,
   z,
-  Ys[MAX_NOS+1][MAX_STEPS+1], /* Essa matriz irá armazenar até no máximo 5 valores passados da analise, mas necessitamos salvar tudo em um arquivo */
+  Ys[MAX_STEPS+2][MAX_NOS+1], /* Essa matriz irá armazenar até no máximo 5 valores passados da analise, mas necessitamos salvar tudo em um arquivo */
   Yn[MAX_NOS+1][MAX_NOS+2];
 
 /* Resolucao de sistema de equacoes lineares.
@@ -135,6 +136,52 @@ int numero(char *nome)
   }
 }
 
+void AdamsMoltonL (int i, int time) /* ADMO do Indutor Completo! */
+{
+    if (time == 2){
+        if(useInicialConditions==1){netlist[i].ini = 0;}
+        z=netlist[i].ini;
+        g=iStepSize/netlist[i].valor;
+    }
+    else if (order == 1){
+        z=Ys[time+1][netlist[i].x];
+        g=stepSize/netlist[i].valor;
+    }
+    else if (order == 2){
+        z=((Ys[time+1][netlist[i].x])+((stepSize/(2*netlist[i].valor))*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])));
+        g=stepSize/(2*netlist[i].valor);
+    }
+    else if (order == 3){
+        z=((Ys[time+1][netlist[i].x])+(8*(stepSize/(12*netlist[i].valor))*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((stepSize/(12*netlist[i].valor))*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b])));
+        g=(5*(stepSize/(12*netlist[i].valor)));
+    }
+    else if (order == 4){
+        z=((Ys[time+1][netlist[i].x])+(19*(stepSize/(24*netlist[i].valor))*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-(5*(stepSize/(24*netlist[i].valor))*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b]))-((stepSize/(24*netlist[i].valor))*(Ys[time+3][netlist[i].a]-Ys[time+3][netlist[i].b])));
+        g=(9*(stepSize/(24*netlist[i].valor)));
+    }
+}
+
+void AdamsMoltonC (int i, int time)
+{
+    if (time == 2){
+        if(useInicialConditions==1){netlist[i].ini = 0;}   /* iStpeSize - StepSize inicial para começar a analise */
+        z=(netlist[i].ini*(netlist[i].valor/iStepSize)); /* iStpeSize - StepSize inicial para começar a analise */
+        g=((netlist[i].valor)/(iStepSize));
+    }
+    else if (order == 1){
+        z=((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*(netlist[i].valor/stepSize));
+        g=((netlist[i].valor)/(stepSize));
+    }
+    else if (order == 2){ /* fez se necessário o equecionamento das correntes no capacitor */
+
+    }
+    else if (order == 3){ /* fez se necessário o equecionamento das correntes no capacitor */
+
+    }
+    else if (order == 4){ /* fez se necessário o equecionamento das correntes no capacitor */
+
+    }
+}
 int main(void)
 {
   system("cls");
@@ -169,11 +216,9 @@ int main(void)
       if ((quant=sscanf(p,"%lg%lg%6s%i%4s",&finalTime,&stepSize,method,&intSteps,uic))!=5){
         useInicialConditions = 1; /* 1 = Não usar Condições Iniciais ; 2 = Usar Condições Iniciais */
       }
-    
     #ifdef DEBUG  
-    printf("%lg %lg %s %i %s quant=%i\n",finalTime,stepSize,method,intSteps,uic,quant);     /* Debug - Igor ;)  */
+    printf("%lg %lg %s %i %s %i\n",finalTime,stepSize,method,intSteps,uic,quant);/* Debug - Igor */
     #endif
-    
     order=atoi(method+4); /* Tem que ser o 4 pq o 5 é o endOfString ADMO"N"  */
     ne--;
     }
@@ -232,10 +277,6 @@ int main(void)
       strcat(lista[nv],netlist[i].nome);
       netlist[i].x=nv;
     }
-    /* Retirei o Else if que estava só para o L e juntei com o acima,
-    dos outros elementos que tem variáveis de corrente adicionadas
-    de forma igual  */
-    
     else if (tipo=='H') {
       nv=nv+2;
       if (nv>MAX_NOS) {
@@ -291,21 +332,17 @@ int main(void)
   /* Monta estampas */ /* ANTES DE TUDO FAZER ANALISE DE ORDEM 1 COM STEP MENOR QUE O NORMAL PARA ACHAR O V(t0) */
   for (i=1; i<=ne; i++) {
     tipo=netlist[i].nome[0];
-    if(tipo=='L'){                          /* Para ajudar :   j(t0),v(t0) - Fonte de corrente fixa que vai de A -> B */                                                                             /* (∆t/nL(...)) - Resistor (INVERTIDO) 1/R */
-      if(useInicialConditions==1){netlist[i].ini = 0;}
-        z=netlist[i].ini; /* Atenção aqui; X denota as condições iniciais. Caso não tenha foi SETADO como 0 */
-        g=iStepSize/netlist[i].valor; /* iStpeSize - StepSize inicial para começar a analise */  /* 1 - j(t0+∆t) ≈ j(t0) + (∆t/L)v(t0 + ∆t) */
-        Yn[netlist[i].a][netlist[i].x]+=1;                                   /* 2 - j(t0+∆t) ≈ j(t0) + (∆t/2L)(v(t0) + v(t0 + ∆t)) */
-        Yn[netlist[i].b][netlist[i].x]-=1;                                   /* 3 - j(t0+∆t) ≈ j(t0) + (∆t/12L)(8v(t0) - v(t0 - ∆t) + 5v(t0 + ∆t)) */
-        Yn[netlist[i].x][netlist[i].a]-=1;                                   /* 4 - j(t0+∆t) ≈ j(t0) + (∆t/24L)(19v(t0) - 5v(t0 - ∆t) + 3v(t0 + ∆t)+ v(t0 - 2∆t)) */
+    if(tipo=='L'){  /* Para ajudar :  (∆t/nL(...)) - Resistor (INVERTIDO) 1/R */
+        AdamsMoltonL(i,time);
+        Yn[netlist[i].a][netlist[i].x]+=1;
+        Yn[netlist[i].b][netlist[i].x]-=1;
+        Yn[netlist[i].x][netlist[i].a]-=1;
         Yn[netlist[i].x][netlist[i].b]+=1;
         Yn[netlist[i].x][netlist[i].x]+=g;
         Yn[netlist[i].x][nv+1]+=z;          /* Fonte de corrente sendo Adicionada */
     }
-    else if(tipo=='C'){                          /* Para ajudar :   j(t0),v(t0) - Fonte de corrente fixa que vai de A -> B */                                                                             /* (∆t/nL(...)) - Resistor (INVERTIDO) 1/R */
-      if(useInicialConditions==1){netlist[i].ini = 0;}   /* iStpeSize - StepSize inicial para começar a analise */
-        z=(netlist[i].ini*(netlist[i].valor/iStepSize)); /* iStpeSize - StepSize inicial para começar a analise */
-        g=(netlist[i].valor/iStepSize);
+    else if(tipo=='C'){
+        AdamsMoltonC(i,time);
         Yn[netlist[i].a][netlist[i].a]+=g;
         Yn[netlist[i].b][netlist[i].b]+=g;
         Yn[netlist[i].a][netlist[i].b]-=g;
@@ -403,14 +440,35 @@ int main(void)
     }
   getch();
 #endif
+
+/* Zera a matriz de saves */
+  if(time==2){
+    for (i=0; i<=5; i++) {
+      for (j=0; j<=nv; j++){
+        Ys[i][j]=0;
+      }
+    }
+  }
+
   /* Mostra solucao */
   printf("Solucao:\n");
   strcpy(txt,"Tensao");
   for (i=1; i<=nv; i++) {
-    if (i==nn+1) strcpy(txt,"Corrente");
+    if (i==nn+1){strcpy(txt,"Corrente"); }
+    Ys[time][i]=Yn[i][nv+1]; /* Aproveitei que ele já estava listando tudo e copio o valor para a matriz Ys */
     printf("%s %s: %g\n",txt,lista[i],Yn[i][nv+1]);
   }
+  /* Rotina Para dar um shift nos valores salvos na matriz Ys */
+  if (time == -1){ /* poderiamos implementar em 1 for só isso aqui. Mas to com sono agora. */
+    time=0;
+    for (i=1; i<=nv;i++){
+        Ys[2][i]=Ys[1][i];
+    }
+    for (i=1; i<=nv;i++){
+        Ys[1][i]=Ys[0][i];
+    }
+  }
+  time--;
   getch();
   return 0;
 }
-
