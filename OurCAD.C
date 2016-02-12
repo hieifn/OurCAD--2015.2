@@ -485,7 +485,7 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
         Yc[time][i]=( ((12*(netlist[i].valor)/(5*stepSize))*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])))-((8/5)*Yc[time+1][i])+((1/5)*Yc[time+2][i]));
       }
       else if (order == 4){ /* Pode ter merda aqui também. */
-        Yc[time][i]=((24/3)*(netlist[i].valor/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((19/3)*Yc[time+1][i])+((5/3)*Yc[time+2][i])-((1/3)*Yc[time+3][i]));
+        Yc[time][i]=((24/9)*(netlist[i].valor/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((19/9)*Yc[time+1][i])+((5/9)*Yc[time+2][i])-((1/9)*Yc[time+3][i]));
         //printf(" %g %g %g %g %g %g %g ",Yn[netlist[i].a][nv+1],Yn[netlist[i].b][nv+1],Ys[time+1][netlist[i].a],Ys[time+1][netlist[i].b],Yc[time+1][i],Yc[time+2][i],Yc[time+3][i]);
         //getch();
       }
