@@ -1,4 +1,4 @@
-/*
+/* admo fazendo merda checar tudo.
 Elementos aceitos e linhas do netlist:
 
 Resistor:  R<nome> <no+> <no-> <resistencia>
@@ -29,9 +29,9 @@ Os nos podem ser nomes
 #define MAX_ELEM 50
 #define MAX_NOS 50
 #define TOLG 1e-9
-#define TOLG2 3e-2
+#define TOLG2 3e-20
 #define DEBUG
-#define MAX_STEPS 3
+#define MAX_STEPS 4
 
 typedef struct elemento { /* Elemento do netlist */
   char nome[MAX_NOME];
@@ -46,11 +46,11 @@ int
   quant,
   intSteps,
   order,
-  time = 2, /* variavel para armazenamento  */
+  time = 3, /* variavel para armazenamento  */
   ne, /* Elementos */
   nv, /* Variaveis */
   nn, /* Nos */
-  i,j,k;
+  i,j,k,w;
 
 char
 /* Foram colocados limites nos formatos de leitura para alguma protecao
@@ -71,7 +71,8 @@ double
   stepSize,
   g,
   z,
-  Ys[MAX_STEPS+2][MAX_NOS+1], /* Essa matriz irá armazenar até no máximo 5 valores passados da analise, mas necessitamos salvar tudo em um arquivo */
+  Yc[MAX_STEPS+2][MAX_NOS+1], /* Essa matriz ira armazenar os valores das correntes nos capacitores */
+  Ys[MAX_STEPS+2][MAX_NOS+1], /* Essa matriz irá armazenar até no máximo 3 valores passados da analise */
   Yn[MAX_NOS+1][MAX_NOS+2];
 
 /* Resolucao de sistema de equacoes lineares.
@@ -138,48 +139,51 @@ int numero(char *nome)
 
 void AdamsMoltonL (int i, int time) /* ADMO do Indutor Completo! */
 {
-    if (time == 2){
+    if (time == 3){
         if(useInicialConditions==1){netlist[i].ini = 0;}
-        z=netlist[i].ini;
-        g=iStepSize/netlist[i].valor;
+        z=(netlist[i].ini*(netlist[i].valor/iStepSize));
+        g=netlist[i].valor/iStepSize;
     }
-    else if (order == 1){
-        z=Ys[time+1][netlist[i].x];
-        g=stepSize/netlist[i].valor;
+    else if (order == 1){ /* PERFEITO */
+        z=((netlist[i].valor/stepSize)*Ys[time+1][netlist[i].x]);
+        g=netlist[i].valor/stepSize;
     }
-    else if (order == 2){
-        z=((Ys[time+1][netlist[i].x])+((stepSize/(2*netlist[i].valor))*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])));
-        g=stepSize/(2*netlist[i].valor);
+    else if (order == 2){/* PERFEITO, EXATIDÃO NAS CASAS DECIMAIS */
+        z=((((2*netlist[i].valor)/stepSize)*(Ys[time+1][netlist[i].x]))+(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]));
+        g=((2*netlist[i].valor)/stepSize);
     }
-    else if (order == 3){
-        z=((Ys[time+1][netlist[i].x])+(8*(stepSize/(12*netlist[i].valor))*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((stepSize/(12*netlist[i].valor))*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b])));
-        g=(5*(stepSize/(12*netlist[i].valor)));
+    else if (order == 3){ /* Nao está batendo nas casas decimais! Mas os resultados estão bons */
+        z=(((Ys[time+1][netlist[i].x])*((12*netlist[i].valor)/(5*stepSize)))+((8/5)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((1/5)*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b])));
+        g=((12*netlist[i].valor)/(5*stepSize));
     }
-    else if (order == 4){
-        z=((Ys[time+1][netlist[i].x])+(19*(stepSize/(24*netlist[i].valor))*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-(5*(stepSize/(24*netlist[i].valor))*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b]))-((stepSize/(24*netlist[i].valor))*(Ys[time+3][netlist[i].a]-Ys[time+3][netlist[i].b])));
-        g=(9*(stepSize/(24*netlist[i].valor)));
+    else if (order == 4){ /* ERRO NA ESTAMPA, PROVAVELMENTE SINAL */
+        z=(((Ys[time+1][netlist[i].x])*((24*netlist[i].valor)/(9*stepSize)))+((19/9)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((5/9)*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b]))+((1/9)*(Ys[time+3][netlist[i].a]-Ys[time+3][netlist[i].b])));
+        g=((24*netlist[i].valor)/(9*stepSize));
     }
 }
 
 void AdamsMoltonC (int i, int time)
 {
-    if (time == 2){
+    if (time == 3){
         if(useInicialConditions==1){netlist[i].ini = 0;}   /* iStpeSize - StepSize inicial para começar a analise */
         z=(netlist[i].ini*(netlist[i].valor/iStepSize)); /* iStpeSize - StepSize inicial para começar a analise */
         g=((netlist[i].valor)/(iStepSize));
     }
-    else if (order == 1){
+    else if (order == 1){ /* PERFEITO */
         z=((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*(netlist[i].valor/stepSize));
         g=((netlist[i].valor)/(stepSize));
     }
-    else if (order == 2){ /* fez se necessário o equecionamento das correntes no capacitor */
-
+    else if (order == 2){ /* PERFEITO */
+        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*((2*netlist[i].valor)/stepSize))+Yc[time+1][i]);
+        g=(2*(netlist[i].valor)/(stepSize));
     }
-    else if (order == 3){ /* fez se necessário o equecionamento das correntes no capacitor */
-
+    else if (order == 3){ /* Nao está batendo nas casas decimais! Mas os resultados estão bons */
+        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*(((12/5)*netlist[i].valor)/(stepSize)))+((8/5)*Yc[time+1][i])-((1/5)*Yc[time+2][i]));
+        g=((12/5)*(netlist[i].valor)/(stepSize));
     }
-    else if (order == 4){ /* fez se necessário o equecionamento das correntes no capacitor */
-
+    else if (order == 4){ /* ERRO NA ESTAMPA, PROVAVELMENTE SINAL */
+        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*(((24/9)*netlist[i].valor)/stepSize))+((19/9)*Yc[time+1][i])-((5/9)*Yc[time+2][i])+((1/3)*Yc[time+3][i])  );
+        g=((24/9)*(netlist[i].valor)/(stepSize));
     }
 }
 int main(void)
@@ -216,7 +220,7 @@ int main(void)
       if ((quant=sscanf(p,"%lg%lg%6s%i%4s",&finalTime,&stepSize,method,&intSteps,uic))!=5){
         useInicialConditions = 1; /* 1 = Não usar Condições Iniciais ; 2 = Usar Condições Iniciais */
       }
-    #ifdef DEBUG  
+    #ifdef DEBUG
     printf("%lg %lg %s %i %s %i\n",finalTime,stepSize,method,intSteps,uic,quant);/* Debug - Igor */
     #endif
     order=atoi(method+4); /* Tem que ser o 4 pq o 5 é o endOfString ADMO"N"  */
@@ -322,17 +326,20 @@ int main(void)
   }
   getch();
   /* Monta o sistema nodal modificado */
+
   printf("O circuito tem %d nos, %d variaveis e %d elementos\n",nn,nv,ne);
   getch();
+w=0;
+while(w!=5){ /* While para analise no tempo. Apenas 4 loops para monitorar tudo */
   /* Zera sistema */
   for (i=0; i<=nv; i++) {
     for (j=0; j<=nv+1; j++)
       Yn[i][j]=0;
   }
-  /* Monta estampas */ /* ANTES DE TUDO FAZER ANALISE DE ORDEM 1 COM STEP MENOR QUE O NORMAL PARA ACHAR O V(t0) */
+  /* Monta estampas */
   for (i=1; i<=ne; i++) {
     tipo=netlist[i].nome[0];
-    if(tipo=='L'){  /* Para ajudar :  (∆t/nL(...)) - Resistor (INVERTIDO) 1/R */
+    if(tipo=='L'){
         AdamsMoltonL(i,time);
         Yn[netlist[i].a][netlist[i].x]+=1;
         Yn[netlist[i].b][netlist[i].x]-=1;
@@ -362,6 +369,8 @@ int main(void)
       Yn[netlist[i].a][netlist[i].c]+=g;
       Yn[netlist[i].b][netlist[i].d]+=g;
       Yn[netlist[i].a][netlist[i].d]-=g;
+
+
       Yn[netlist[i].b][netlist[i].c]-=g;
     }
     else if (tipo=='I') {
@@ -440,35 +449,82 @@ int main(void)
     }
   getch();
 #endif
-
+Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
 /* Zera a matriz de saves */
-  if(time==2){
-    for (i=0; i<=5; i++) {
-      for (j=0; j<=nv; j++){
+  if(time==3){
+    for (i=0; i<=4; i++) { /* deixei essa rotina por precaução, para não ter valores indefinidos na matriz de saves */
+      for (j=0; j<=nv; j++){ /* zera também a matriz que salva as correntes do capacitor. */
         Ys[i][j]=0;
+        Yc[i][j]=0;
       }
     }
   }
-
-  /* Mostra solucao */
+  /* Mostra solucao e salva tensões na matriz de saves */
   printf("Solucao:\n");
   strcpy(txt,"Tensao");
-  for (i=1; i<=nv; i++) {
-    if (i==nn+1){strcpy(txt,"Corrente"); }
+  for (i=1; i<=nv; i++){
+    if (i==nn+1){
+      strcpy(txt,"Corrente");
+    }
     Ys[time][i]=Yn[i][nv+1]; /* Aproveitei que ele já estava listando tudo e copio o valor para a matriz Ys */
     printf("%s %s: %g\n",txt,lista[i],Yn[i][nv+1]);
   }
-  /* Rotina Para dar um shift nos valores salvos na matriz Ys */
-  if (time == -1){ /* poderiamos implementar em 1 for só isso aqui. Mas to com sono agora. */
-    time=0;
-    for (i=1; i<=nv;i++){
-        Ys[2][i]=Ys[1][i];
-    }
-    for (i=1; i<=nv;i++){
-        Ys[1][i]=Ys[0][i];
+  for(i=1 ; i<=ne ; i++){ /* rotina que salva as correntes do capacitor na matriz Yc */
+    tipo=netlist[i].nome[0];
+    if (tipo=='C'){
+      if(time==3){
+        Yc[time][i]=0;
+      }
+      else if (order == 1){
+        Yc[time][i]=(((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])));
+      }
+      else if (order == 2){
+        Yc[time][i]=( 2*((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-Yc[time+1][i]);
+      }
+      else if (order == 3){
+        Yc[time][i]=( ((12*(netlist[i].valor)/(5*stepSize))*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])))-((8/5)*Yc[time+1][i])+((1/5)*Yc[time+2][i]));
+      }
+      else if (order == 4){ /* Pode ter merda aqui também. */
+        Yc[time][i]=((24/3)*(netlist[i].valor/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((19/3)*Yc[time+1][i])+((5/3)*Yc[time+2][i])-((1/3)*Yc[time+3][i]));
+        //printf(" %g %g %g %g %g %g %g ",Yn[netlist[i].a][nv+1],Yn[netlist[i].b][nv+1],Ys[time+1][netlist[i].a],Ys[time+1][netlist[i].b],Yc[time+1][i],Yc[time+2][i],Yc[time+3][i]);
+        //getch();
+      }
     }
   }
-  time--;
+  /* Rotina Para extender as condições iniciais para t(-1) e t(-2) Ys e Yc para para o caso INICIAL  */
+    if (time==3){
+      for (i=1; i<=nv; i++) {
+        Ys[4][i]=Ys[3][i]; /* Copia os valores iniciais para os slots extras no tempo */
+        Yc[4][i]=Yc[3][i]; /* Copia os valores das correntes dos cap. iniciais para os slots extras no tempo */
+        Ys[5][i]=Ys[3][i]; /* Copia os valores iniciais para os slots extras no tempo */
+        Yc[5][i]=Yc[3][i]; /* Copia os valores das correntes dos cap. iniciais para os slots extras no tempo */
+      }
+    }
+    if (time == 0){ /* rotina que da shift nos valores de Yc e Ys */
+      time=1;
+      for (i=1; i<=nv;i++){
+        Ys[3][i]=Ys[2][i];
+        Yc[3][i]=Yc[2][i];
+        Ys[2][i]=Ys[1][i];
+        Yc[2][i]=Yc[1][i];
+        Ys[1][i]=Ys[0][i];
+        Yc[1][i]=Yc[0][i];
+      }
+    }
+  // printf("Saves:\n");
+  //  for (i=0; i<=5; i++) { /* deixei essa rotina por precaução, para não ter valores indefinidos na matriz de saves */
+  //    printf("\n saveC%i",i);
+  //    for (j=0; j<=nv; j++){
+  //      if ( tipo == 'C' ){
+  //       /* printf(" %s %g\n ",lista[j],Ys[i][j]); */ /* printa a matriz de saves - debug */
+  //         printf(" %i eh: %g ",j,Yc[i][j]); /* printa a matriz de saves - debug */
+  //      }
+  //    }
+  //  }
+time--;/* um cara problematico, ou não. Vai saber. Não não é */
+w++;/* WHILE demonstrativo para 4 iterações somente. Facilmente ajustado para as iterações necessárias do ADMO */
+}
   getch();
   return 0;
 }
+
