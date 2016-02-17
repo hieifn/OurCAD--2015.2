@@ -1,4 +1,4 @@
-/* admo fazendo merda checar tudo.
+/*
 Elementos aceitos e linhas do netlist:
 
 Resistor:  R<nome> <no+> <no-> <resistencia>
@@ -12,12 +12,15 @@ Amp. op.:  O<nome> <vo1> <vo2> <vi1> <vi2>
 Indutor:   L<nome> <no+> <no-> <indutancia> [Corrente Inicial]
 Capacitor: C<nome> <no+> <no-> <Capacitância> [Tensão Inicial]
 
+Fonte senoidal:
+
+
 As fontes F e H tem o ramo de entrada em curto
 O amplificador operacional ideal tem a saida suspensa
 Os nos podem ser nomes
 */
 
-#define versao "1.0j - 26/11/2015"
+#define versao "1.0j - 13/02/2016"
 #include <stdio.h>
 #include <conio.h>
 #include <string.h>
@@ -34,7 +37,7 @@ Os nos podem ser nomes
 #define MAX_STEPS 4
 
 typedef struct elemento { /* Elemento do netlist */
-  char nome[MAX_NOME];
+  char nome[MAX_NOME],type[MAX_NOME];
   double valor,ini;
   int a,b,c,d,x,y;
 } elemento;
@@ -66,6 +69,7 @@ char
 FILE *arquivo;
 
 double
+  timeA=0,
   iStepSize= TOLG2,
   finalTime,
   stepSize,
@@ -190,7 +194,7 @@ int main(void)
 {
   system("cls");
   printf("Programa de analise no tempo, pelo metodo de Adams-Molton\n");
-  printf("Por Transões da UFRJ\n"); /*Galera troquem deoois !*/
+  printf("Desenvolvido por : Igor F. Nascimento, Eduardo Naslausky e Alan Carpilovisky\n"); /*Galera troquem deoois !*/
   printf("Versao %s\n",versao);
  denovo:
   /* Leitura do netlist */
@@ -234,7 +238,13 @@ int main(void)
       netlist[ne].a=numero(na);
       netlist[ne].b=numero(nb);
     }
-    else if (tipo=='R' || tipo=='I' || tipo=='V') {
+    else if (tipo=='V') {
+      sscanf(p,"%10s%10s%10s",na,nb,netlist[ne].type);/* Paramos aqui, Tipo das fontes novas OBS Cuidado fonte DC o programa não aceita mais.*/
+      printf("%s %s %s %g\n",netlist[ne].nome,na,nb,netlist[ne].valor);
+      netlist[ne].a=numero(na);
+      netlist[ne].b=numero(nb);
+    }
+    else if (tipo=='R' || tipo=='I') {
       sscanf(p,"%10s%10s%lg",na,nb,&netlist[ne].valor);
       printf("%s %s %s %g\n",netlist[ne].nome,na,nb,netlist[ne].valor);
       netlist[ne].a=numero(na);
@@ -329,8 +339,20 @@ int main(void)
 
   printf("O circuito tem %d nos, %d variaveis e %d elementos\n",nn,nv,ne);
   getch();
-w=0;
-while(w!=5){ /* While para analise no tempo. Apenas 4 loops para monitorar tudo */
+
+  arquivo=fopen("output.tab", "w");
+
+  fprintf (arquivo, "t ");
+
+  for (i=0;i<nv; i++){
+    fprintf(arquivo, "%s ", lista[i]);
+  }
+  fprintf (arquivo, "\n");
+  fclose(arquivo);
+
+
+  w=0;
+  while(w<20){ /* While para analise no tempo. Apenas 4 loops para monitorar tudo */
   /* Zera sistema */
   for (i=0; i<=nv; i++) {
     for (j=0; j<=nv+1; j++)
@@ -369,8 +391,6 @@ while(w!=5){ /* While para analise no tempo. Apenas 4 loops para monitorar tudo 
       Yn[netlist[i].a][netlist[i].c]+=g;
       Yn[netlist[i].b][netlist[i].d]+=g;
       Yn[netlist[i].a][netlist[i].d]-=g;
-
-
       Yn[netlist[i].b][netlist[i].c]-=g;
     }
     else if (tipo=='I') {
@@ -462,13 +482,22 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
   /* Mostra solucao e salva tensões na matriz de saves */
   printf("Solucao:\n");
   strcpy(txt,"Tensao");
+
+
+  arquivo=fopen ("output.tab","a");
+  fprintf(arquivo, "%g ",timeA);
   for (i=1; i<=nv; i++){
     if (i==nn+1){
       strcpy(txt,"Corrente");
     }
     Ys[time][i]=Yn[i][nv+1]; /* Aproveitei que ele já estava listando tudo e copio o valor para a matriz Ys */
     printf("%s %s: %g\n",txt,lista[i],Yn[i][nv+1]);
+    fprintf(arquivo, "%g ",Yn[i][nv+1]);
   }
+  fprintf (arquivo, "\n");
+  fclose (arquivo);
+
+
   for(i=1 ; i<=ne ; i++){ /* rotina que salva as correntes do capacitor na matriz Yc */
     tipo=netlist[i].nome[0];
     if (tipo=='C'){
@@ -486,12 +515,12 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
       }
       else if (order == 4){ /* Pode ter merda aqui também. */
         Yc[time][i]=((24/9)*(netlist[i].valor/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((19/9)*Yc[time+1][i])+((5/9)*Yc[time+2][i])-((1/9)*Yc[time+3][i]));
-        //printf(" %g %g %g %g %g %g %g ",Yn[netlist[i].a][nv+1],Yn[netlist[i].b][nv+1],Ys[time+1][netlist[i].a],Ys[time+1][netlist[i].b],Yc[time+1][i],Yc[time+2][i],Yc[time+3][i]);
-        //getch();
+        printf(" %g %g %g %g %g %g %g ",Yn[netlist[i].a][nv+1],Yn[netlist[i].b][nv+1],Ys[time+1][netlist[i].a],Ys[time+1][netlist[i].b],Yc[time+1][i],Yc[time+2][i],Yc[time+3][i]);
+        getch();
       }
     }
   }
-  /* Rotina Para extender as condições iniciais para t(-1) e t(-2) Ys e Yc para para o caso INICIAL  */
+  /* Rotina Para extender as condições iniciais para t(-1) e t(-2) Ys e Yc para para o caso INICIAL ; PODE JUNTAR ESSA ROTINA NO FOR ACIMA*/
     if (time==3){
       for (i=1; i<=nv; i++) {
         Ys[4][i]=Ys[3][i]; /* Copia os valores iniciais para os slots extras no tempo */
@@ -500,7 +529,7 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
         Yc[5][i]=Yc[3][i]; /* Copia os valores das correntes dos cap. iniciais para os slots extras no tempo */
       }
     }
-    if (time == 0){ /* rotina que da shift nos valores de Yc e Ys */
+    if (time == 0){ /* rotina que da shift nos valores de Yc e Ys; PODE JUNTAR ESSA ROTINA EM UM FOR ACIMA !*/
       time=1;
       for (i=1; i<=nv;i++){
         Ys[3][i]=Ys[2][i];
@@ -521,6 +550,7 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
   //      }
   //    }
   //  }
+timeA+=stepSize;
 time--;/* um cara problematico, ou não. Vai saber. Não não é */
 w++;/* WHILE demonstrativo para 4 iterações somente. Facilmente ajustado para as iterações necessárias do ADMO */
 }
