@@ -38,8 +38,9 @@ Os nos podem ser nomes
 
 typedef struct elemento { /* Elemento do netlist */
   char nome[MAX_NOME],type[MAX_NOME];
-  double valor,ini;
+  double valor,ini, param1, param2, param3, param4, param5, param6, param7;
   int a,b,c,d,x,y;
+
 } elemento;
 
 elemento netlist[MAX_ELEM]; /* Netlist */
@@ -75,6 +76,8 @@ double
   stepSize,
   g,
   z,
+  pulseOffTime,
+  pulseRealTime,
   Yc[MAX_STEPS+2][MAX_NOS+1], /* Essa matriz ira armazenar os valores das correntes nos capacitores */
   Ys[MAX_STEPS+2][MAX_NOS+1], /* Essa matriz irá armazenar até no máximo 3 valores passados da analise */
   Yn[MAX_NOS+1][MAX_NOS+2];
@@ -152,7 +155,7 @@ void AdamsMoltonL (int i, int time) /* ADMO do Indutor Completo! */
         z=((netlist[i].valor/stepSize)*Ys[time+1][netlist[i].x]);
         g=netlist[i].valor/stepSize;
     }
-    else if (order == 2){/* PERFEITO, EXATIDÃO NAS CASAS DECIMAIS */
+    else if (order == 2){/* PERFEITO */
         z=((((2*netlist[i].valor)/stepSize)*(Ys[time+1][netlist[i].x]))+(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]));
         g=((2*netlist[i].valor)/stepSize);
     }
@@ -239,8 +242,17 @@ int main(void)
       netlist[ne].b=numero(nb);
     }
     else if (tipo=='V') {
-      sscanf(p,"%10s%10s%10s",na,nb,netlist[ne].type);/* Paramos aqui, Tipo das fontes novas OBS Cuidado fonte DC o programa não aceita mais.*/
+      sscanf(p,"%10s%10s%10s%lg%lg%lg%lg%lg%lg%lg%lg",na,nb,netlist[ne].type,
+                                            &netlist[ne].valor, /* Amplitude 1*/
+                                            &netlist[ne].param1,/* Amplitude2*/
+                                            &netlist[ne].param2, /* Atraso*/
+                                            &netlist[ne].param3, /* Tempo de subida*/
+                                            &netlist[ne].param4, /* Tempo de descida*/
+                                            &netlist[ne].param5, /* Tempo ligada*/
+                                            &netlist[ne].param6, /* Periodo */
+                                            &netlist[ne].param7);/* n de ciclos*/
       printf("%s %s %s %g\n",netlist[ne].nome,na,nb,netlist[ne].valor);
+   // printf("%s %g %g %g %g %g %g %g \n", netlist[ne].type, netlist[ne].param1,netlist[ne].param2,netlist[ne].param3,netlist[ne].param4,netlist[ne].param5,netlist[ne].param6,netlist[ne].param7);
       netlist[ne].a=numero(na);
       netlist[ne].b=numero(nb);
     }
@@ -344,7 +356,7 @@ int main(void)
 
   fprintf (arquivo, "t ");
 
-  for (i=0;i<nv; i++){
+  for (i=1;i<=nv; i++){
     fprintf(arquivo, "%s ", lista[i]);
   }
   fprintf (arquivo, "\n");
@@ -352,7 +364,7 @@ int main(void)
 
 
   w=0;
-  while(w<20){ /* While para analise no tempo. Apenas 4 loops para monitorar tudo */
+  while(w<100){ /* While para analise no tempo. Apenas 20 loops para monitorar tudo */
   /* Zera sistema */
   for (i=0; i<=nv; i++) {
     for (j=0; j<=nv+1; j++)
@@ -403,8 +415,62 @@ int main(void)
       Yn[netlist[i].b][netlist[i].x]-=1;
       Yn[netlist[i].x][netlist[i].a]-=1;
       Yn[netlist[i].x][netlist[i].b]+=1;
-      Yn[netlist[i].x][nv+1]-=netlist[i].valor;
-    }
+
+
+      if ((strcmp(netlist[i].type,"DC"))==0){
+        Yn[netlist[i].x][nv+1]-=netlist[i].valor;
+      }
+
+      else if ((strcmp(netlist[i].type,"SIN"))==0){
+
+            if (timeA<netlist[i].param3){
+                Yn[netlist[i].x][nv+1]-= (  netlist[i].valor +  netlist[i].param1 *
+                        sin((M_PI/180)*netlist[i].param5));
+            }
+
+            else if (timeA > (netlist[i].param3 + (netlist[i].param6)*(1/netlist[i].param2)) ) {
+                Yn[netlist[i].x][nv+1]-= (  netlist[i].valor +  netlist[i].param1 * exp(-netlist[i].param4*(netlist[i].param6/netlist[i].param2)) *
+                        sin( ((2* M_PI * netlist[i].param2) * (netlist[i].param6/netlist[i].param2)) + (M_PI/180)*netlist[i].param5 ));
+
+            }
+
+            else{
+                Yn[netlist[i].x][nv+1]-= (  netlist[i].valor +  netlist[i].param1 * exp(-netlist[i].param4*(timeA-netlist[i].param3)) *
+                        sin( ((2* M_PI * netlist[i].param2) * (timeA-netlist[i].param3)) + (M_PI/180)*netlist[i].param5 ));
+            }}
+
+      else if ((strcmp(netlist[i].type,"PULSE"))==0){
+
+        pulseRealTime=timeA-netlist[i].param2;
+        pulseRealTime= fmod(pulseRealTime,netlist[i].param6);
+        pulseOffTime=netlist[i].param6- (netlist[i].param3+netlist[i].param4+netlist[i].param5);
+        if (timeA<netlist[i].param2){
+            Yn[netlist[i].x][nv+1]-=netlist[i].valor;
+        }
+
+        else if (timeA> (netlist[i].param2 +(netlist[i].param7*netlist[i].param6) ) ) {
+            Yn[netlist[i].x][nv+1]-=netlist[i].valor;
+        }
+            else {
+                        if (pulseRealTime<netlist[i].param3 ){ /* subindo*/
+                            Yn[netlist[i].x][nv+1]-=((((netlist[i].param1-netlist[i].valor)/netlist[i].param3)*pulseRealTime)+ netlist[i].valor);
+                        }
+                        else if (pulseRealTime< (netlist[i].param3+netlist[i].param5)){
+                            Yn[netlist[i].x][nv+1]-=netlist[i].param1;
+                        }
+                        else if (pulseRealTime< (netlist[i].param3+netlist[i].param5+netlist[i].param4)){
+                            Yn[netlist[i].x][nv+1]-= (netlist[i].param1-
+                                                     (((netlist[i].param1-netlist[i].valor)/netlist[i].param4)*
+                                                     (pulseRealTime-(netlist[i].param3+netlist[i].param5))));
+                            }
+                        else {
+                            Yn[netlist[i].x][nv+1]-=netlist[i].valor;
+                        }
+
+            }
+        }
+      }
+
     else if (tipo=='E') {
       g=netlist[i].valor;
       Yn[netlist[i].a][netlist[i].x]+=1;
@@ -480,7 +546,9 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
     }
   }
   /* Mostra solucao e salva tensões na matriz de saves */
+  #ifdef DEBUG
   printf("Solucao:\n");
+  #endif // DEBUG
   strcpy(txt,"Tensao");
 
 
@@ -491,7 +559,9 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
       strcpy(txt,"Corrente");
     }
     Ys[time][i]=Yn[i][nv+1]; /* Aproveitei que ele já estava listando tudo e copio o valor para a matriz Ys */
+    #ifdef DEBUG
     printf("%s %s: %g\n",txt,lista[i],Yn[i][nv+1]);
+    #endif // DEBUG
     fprintf(arquivo, "%g ",Yn[i][nv+1]);
   }
   fprintf (arquivo, "\n");
