@@ -7,12 +7,15 @@ VCVC:      E<nome> <vo+> <vo-> <vi+> <vi-> <ganho de tensao>
 CCCS:      F<nome> <io+> <io-> <ii+> <ii-> <ganho de corrente>
 CCVS:      H<nome> <vo+> <vo-> <ii+> <ii-> <transresistencia>
 Fonte I:   I<nome> <io+> <io-> <corrente>
-Fonte V:   V<nome> <vo+> <vo-> <tensao>
+Fonte V:   V<nome> <vo+> <vo-> <tensao> <parâmetros>
 Amp. op.:  O<nome> <vo1> <vo2> <vi1> <vi2>
 Indutor:   L<nome> <no+> <no-> <indutancia> [Corrente Inicial]
 Capacitor: C<nome> <no+> <no-> <Capacitância> [Tensão Inicial]
 
-Fonte senoidal:
+Parâmetros para as fontes de tensão (V):
+Fonte DC : DC <valor>
+Fonte senoidal: SIN <nível contínuo> <amplitude> <frequencia> <atraso> <amortecimento> <defasagem>
+Fonte pulso: PULSE <amplitude1> <amplitude2> <atraso> <tempo de subida> <tempo de descida> <tempo ligada> <período> <número de cíclos>
 
 
 As fontes F e H tem o ramo de entrada em curto
