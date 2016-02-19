@@ -161,20 +161,20 @@ void AdamsMoltonL (int i, int time) /* ADMO do Indutor Completo! */
     else if (order == 2){/* PERFEITO */
         z=((((2*netlist[i].valor)/stepSize)*(Ys[time+1][netlist[i].x]))+(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]));
         g=((2*netlist[i].valor)/stepSize);
-    //    printf("z: %g g: %g Ys1 :%g Ys2 :%g Ys3 :%g\n ",z,g,Ys[time+1][netlist[i].a],Ys[time+2][netlist[i].a],Ys[time+3][netlist[i].a]);
-    //    getch();
+     //   printf("z: %g g: %g\n ",z,g);
+     //   getch();
     }
     else if (order == 3){ /* PERFEITO */
         z=( ((12/5)*((Ys[time+1][netlist[i].x])*((netlist[i].valor)/(stepSize)))) + ((8/5)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])) - ((1/5)*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b])));
         g=((12/5)*((netlist[i].valor)/stepSize));
-   //     printf("z: %g g: %g Ysx :%g Ys1 :%g Ys2 :%g Ys3 :%g\n ",z,g,((19.000/9.0000)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])),Ys[time+1][netlist[i].a],Ys[time+2][netlist[i].a],Ys[time+3][netlist[i].a]);
-   //     getch();
+      //  printf("z: %g g: %g",z,g);
+      //  getch();
     }
     else if (order == 4){ /* Erro na variável z */
         z=((((Ys[time+1][netlist[i].x])*((netlist[i].valor)/stepSize))*(24.0000/9.0000))+((19.0000/9.0000)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((5.0000/9.0000)*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b]))+((1.0000/9.0000)*(Ys[time+3][netlist[i].a]-Ys[time+3][netlist[i].b])));
         g=((24.0000/9.0000)*((netlist[i].valor)/stepSize));
-    //    printf("z: %g g: %g Ysx :%g Ys1 :%g Ys2 :%g Ys3 :%g\n ",z,g,((19.000/9.0000)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])),Ys[time+1][netlist[i].a],Ys[time+2][netlist[i].a],Ys[time+3][netlist[i].a]);
-    //    getch();
+     //   printf("z: %g g: %g\n ",z,g);
+     //   getch();
     }
 }
 
@@ -192,17 +192,19 @@ void AdamsMoltonC (int i, int time)
     else if (order == 2){ /* PERFEITO */
         z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*((2*netlist[i].valor)/stepSize))+Yc[time+1][netlist[i].x]);
         g=(2*(netlist[i].valor)/(stepSize));
-//        printf("g :%g z: %g\n",g,z);
-//        getch();
+    //    printf("z :%g g: %g\n",z,g);
+    //    getch();
     }
     else if (order == 3){ /* PERFEITO */
         z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*(((12/5)*netlist[i].valor)/stepSize))+ ((8/5)*Yc[time+1][netlist[i].x]) - ((1/5)*Yc[time+2][netlist[i].x])  );
         g=((12/5)*((netlist[i].valor)/(stepSize)));
+//        printf("save0: %g save2: %g save3: %g\n",(Yc[time+1][netlist[i].x]),Yc[time+2][netlist[i].x],Yc[time+3][netlist[i].x]);
+//        getch();
     }
     else if (order == 4){ /* ERRO NA ESTAMPA, PROVAVELMENTE SINAL */
-        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*((25/9)*((netlist[i].valor)/(stepSize)))) + ((19/9)*Yc[time+1][netlist[i].x]) - ((5/9)*Yc[time+2][netlist[i].x]) + ((1/9)*Yc[time+3][netlist[i].x]));
-        g=((24/9)*((netlist[i].valor)/(stepSize)));
- //       printf("z: %g g: %g",z,g);
+        z=(  ((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*((24.0000/9.0000)*((netlist[i].valor)/(stepSize)))) + ((19.0000/9.0000)*Yc[time+1][netlist[i].x]) - ((5.0000/9.0000)*Yc[time+2][netlist[i].x]) + ((1.0000/9.0000)*Yc[time+3][netlist[i].x]));
+        g=((24.0000/9.0000)*((netlist[i].valor)/(stepSize)));
+ //       printf("save0: %g save2: %g save3: %g\n",(Yc[time+1][netlist[i].x]),Yc[time+2][netlist[i].x],Yc[time+3][netlist[i].x]);
  //       getch();
     }
 }
@@ -240,9 +242,7 @@ int main(void)
       if ((quant=sscanf(p,"%lg%lg%6s%i%4s",&finalTime,&stepSize,method,&intSteps,uic))!=5){
         useInicialConditions = 1; /* 1 = Não usar Condições Iniciais ; 2 = Usar Condições Iniciais */
       }
-    #ifdef DEBUG
     printf("%lg %lg %s %i %s %i\n",finalTime,stepSize,method,intSteps,uic,quant);/* Debug - Igor */
-    #endif
     order=atoi(method+4); /* Tem que ser o 4 pq o 5 é o endOfString ADMO"N"  */
     ne--;
     }
@@ -395,7 +395,7 @@ int main(void)
 
 
   w=0;
-  while(w<(finalTime/stepSize)){ /* While para analise no tempo. Apenas 100 loops para monitorar tudo */
+  while(w<(finalTime/stepSize)){ /* While para analise no tempo.*/
   /* Zera sistema */
   for (i=0; i<=nv; i++) {
     for (j=0; j<=nv+1; j++)
@@ -614,7 +614,9 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
         Yc[time][netlist[i].x]=(  ( ((12/5)*((netlist[i].valor)/stepSize) )*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))) - ((8/5)*Yc[time+1][netlist[i].x]) + ((1/5)*Yc[time+2][netlist[i].x]));
       }
       else if (order == 4){ /* Pode ter merda aqui também. */
-        Yc[time][i]=( ((24.0000/9.0000)*(netlist[i].valor/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))) - ((19.0000/9.0000)*Yc[time+1][netlist[i].x])+((5.0000/9.0000)*Yc[time+2][netlist[i].x])-((1.0000/9.0000)*Yc[time+3][netlist[i].x]));
+        Yc[time][netlist[i].x]=( ( ((24.0/9.0)*((netlist[i].valor)/stepSize) )*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])))- ((19.0/9.0)*Yc[time+1][netlist[i].x])+((5.0/9.0)*Yc[time+2][netlist[i].x])-((1.0/9.0)*Yc[time+3][netlist[i].x]));
+   //     printf("%g\n",Yc[time][netlist[i].x]);
+   //     getch();
       }
     }
   }
@@ -627,8 +629,8 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
         Yc[5][i]=Yc[3][i]; /* Copia os valores das correntes dos cap. iniciais para os slots extras no tempo */
       }
     }
+
     if (time == 0){ /* rotina que da shift nos valores de Yc e Ys; PODE JUNTAR ESSA ROTINA EM UM FOR ACIMA !*/
-      time=1;
       for (i=1; i<=nv;i++){
         Ys[3][i]=Ys[2][i];
         Yc[3][i]=Yc[2][i];
@@ -637,6 +639,7 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
         Ys[1][i]=Ys[0][i];
         Yc[1][i]=Yc[0][i];
       }
+      time=1;
     }
    //printf("Saves:\n");
    // for (i=0; i<=6; i++) { /* deixei essa rotina por precaução, para não ter valores indefinidos na matriz de saves */
