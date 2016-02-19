@@ -155,18 +155,18 @@ void AdamsMoltonL (int i, int time) /* ADMO do Indutor Completo! */
         g=netlist[i].valor/iStepSize;
     }
     else if (order == 1){ /* PERFEITO */
-        z=((netlist[i].valor/stepSize)*Ys[time+1][netlist[i].x]);
-        g=netlist[i].valor/stepSize;
+        z=((netlist[i].valor/stepSize)*(Ys[time+1][netlist[i].x]));
+        g=(netlist[i].valor/stepSize);
     }
     else if (order == 2){/* PERFEITO */
-        z=((((2*netlist[i].valor)/stepSize)*(Ys[time+1][netlist[i].x]))+(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]));
-        g=((2*netlist[i].valor)/stepSize);
+        z=((((2.0*netlist[i].valor)/stepSize)*(Ys[time+1][netlist[i].x]))+(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]));
+        g=((2.0*netlist[i].valor)/stepSize);
      //   printf("z: %g g: %g\n ",z,g);
      //   getch();
     }
     else if (order == 3){ /* PERFEITO */
-        z=( ((12/5)*((Ys[time+1][netlist[i].x])*((netlist[i].valor)/(stepSize)))) + ((8/5)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])) - ((1/5)*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b])));
-        g=((12/5)*((netlist[i].valor)/stepSize));
+        z=( ((12.0/5.0)*((Ys[time+1][netlist[i].x])*((netlist[i].valor)/(stepSize)))) + ((8.0/5.0)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])) - ((1.0/5.0)*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b])));
+        g=((12.0/5.0)*((netlist[i].valor)/stepSize));
       //  printf("z: %g g: %g",z,g);
       //  getch();
     }
@@ -190,14 +190,14 @@ void AdamsMoltonC (int i, int time)
         g=((netlist[i].valor)/(stepSize));
     }
     else if (order == 2){ /* PERFEITO */
-        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*((2*netlist[i].valor)/stepSize))+Yc[time+1][netlist[i].x]);
-        g=(2*(netlist[i].valor)/(stepSize));
+        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*((2.0*netlist[i].valor)/stepSize))+Yc[time+1][netlist[i].x]);
+        g=(2.0*(netlist[i].valor)/(stepSize));
     //    printf("z :%g g: %g\n",z,g);
     //    getch();
     }
     else if (order == 3){ /* PERFEITO */
-        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*(((12/5)*netlist[i].valor)/stepSize))+ ((8/5)*Yc[time+1][netlist[i].x]) - ((1/5)*Yc[time+2][netlist[i].x])  );
-        g=((12/5)*((netlist[i].valor)/(stepSize)));
+        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*(((12.0/5.0)*netlist[i].valor)/stepSize))+ ((8.0/5.0)*Yc[time+1][netlist[i].x]) - ((1.0/5.0)*Yc[time+2][netlist[i].x])  );
+        g=((12.0/5.0)*((netlist[i].valor)/(stepSize)));
 //        printf("save0: %g save2: %g save3: %g\n",(Yc[time+1][netlist[i].x]),Yc[time+2][netlist[i].x],Yc[time+3][netlist[i].x]);
 //        getch();
     }
@@ -608,10 +608,10 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
         Yc[time][netlist[i].x]=(((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])));
       }
       else if (order == 2){
-        Yc[time][netlist[i].x]=( 2*((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-Yc[time+1][netlist[i].x]);
+        Yc[time][netlist[i].x]=( 2.0*((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-Yc[time+1][netlist[i].x]);
       }
       else if (order == 3){
-        Yc[time][netlist[i].x]=(  ( ((12/5)*((netlist[i].valor)/stepSize) )*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))) - ((8/5)*Yc[time+1][netlist[i].x]) + ((1/5)*Yc[time+2][netlist[i].x]));
+        Yc[time][netlist[i].x]=(  ( ((12.0/5.0)*((netlist[i].valor)/stepSize) )*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))) - ((8.0/5.0)*Yc[time+1][netlist[i].x]) + ((1.0/5.0)*Yc[time+2][netlist[i].x]));
       }
       else if (order == 4){ /* Pode ter merda aqui também. */
         Yc[time][netlist[i].x]=( ( ((24.0/9.0)*((netlist[i].valor)/stepSize) )*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])))- ((19.0/9.0)*Yc[time+1][netlist[i].x])+((5.0/9.0)*Yc[time+2][netlist[i].x])-((1.0/9.0)*Yc[time+3][netlist[i].x]));
