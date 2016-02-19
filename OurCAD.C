@@ -13,10 +13,9 @@ Indutor:   L<nome> <no+> <no-> <indutancia> [Corrente Inicial]
 Capacitor: C<nome> <no+> <no-> <Capacitância> [Tensão Inicial]
 
 Parâmetros para as fontes de tensão (V):
-Fonte DC : DC <valor>
-Fonte senoidal: SIN <nível contínuo> <amplitude> <frequencia> <atraso> <amortecimento> <defasagem>
-Fonte pulso: PULSE <amplitude1> <amplitude2> <atraso> <tempo de subida> <tempo de descida> <tempo ligada> <período> <número de cíclos>
-
+    Fonte DC : DC <valor>
+    Fonte senoidal: SIN <nível contínuo> <amplitude> <frequencia> <atraso> <amortecimento> <defasagem>
+    Fonte pulso: PULSE <amplitude1> <amplitude2> <atraso> <tempo de subida> <tempo de descida> <tempo ligada> <período> <número de cíclos>
 
 As fontes F e H tem o ramo de entrada em curto
 O amplificador operacional ideal tem a saida suspensa
@@ -36,7 +35,7 @@ Os nos podem ser nomes
 #define MAX_NOS 50
 #define TOLG 1e-9
 #define TOLG2 3e-20
-#define DEBUG
+//#define DEBUG
 #define MAX_STEPS 4
 
 typedef struct elemento { /* Elemento do netlist */
@@ -54,6 +53,7 @@ int
   intSteps,
   order,
   time = 3, /* variavel para armazenamento  */
+  icc = 0, /* Correntes capacitor */
   ne, /* Elementos */
   nv, /* Variaveis */
   nn, /* Nos */
@@ -161,14 +161,20 @@ void AdamsMoltonL (int i, int time) /* ADMO do Indutor Completo! */
     else if (order == 2){/* PERFEITO */
         z=((((2*netlist[i].valor)/stepSize)*(Ys[time+1][netlist[i].x]))+(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]));
         g=((2*netlist[i].valor)/stepSize);
+    //    printf("z: %g g: %g Ys1 :%g Ys2 :%g Ys3 :%g\n ",z,g,Ys[time+1][netlist[i].a],Ys[time+2][netlist[i].a],Ys[time+3][netlist[i].a]);
+    //    getch();
     }
-    else if (order == 3){ /* Nao está batendo nas casas decimais! Mas os resultados estão bons */
-        z=(((Ys[time+1][netlist[i].x])*((12*netlist[i].valor)/(5*stepSize)))+((8/5)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((1/5)*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b])));
-        g=((12*netlist[i].valor)/(5*stepSize));
+    else if (order == 3){ /* PERFEITO */
+        z=( ((12/5)*((Ys[time+1][netlist[i].x])*((netlist[i].valor)/(stepSize)))) + ((8/5)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])) - ((1/5)*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b])));
+        g=((12/5)*((netlist[i].valor)/stepSize));
+   //     printf("z: %g g: %g Ysx :%g Ys1 :%g Ys2 :%g Ys3 :%g\n ",z,g,((19.000/9.0000)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])),Ys[time+1][netlist[i].a],Ys[time+2][netlist[i].a],Ys[time+3][netlist[i].a]);
+   //     getch();
     }
-    else if (order == 4){ /* ERRO NA ESTAMPA, PROVAVELMENTE SINAL */
-        z=(((Ys[time+1][netlist[i].x])*((24*netlist[i].valor)/(9*stepSize)))+((19/9)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((5/9)*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b]))+((1/9)*(Ys[time+3][netlist[i].a]-Ys[time+3][netlist[i].b])));
-        g=((24*netlist[i].valor)/(9*stepSize));
+    else if (order == 4){ /* Erro na variável z */
+        z=((((Ys[time+1][netlist[i].x])*((netlist[i].valor)/stepSize))*(24.0000/9.0000))+((19.0000/9.0000)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((5.0000/9.0000)*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b]))+((1.0000/9.0000)*(Ys[time+3][netlist[i].a]-Ys[time+3][netlist[i].b])));
+        g=((24.0000/9.0000)*((netlist[i].valor)/stepSize));
+    //    printf("z: %g g: %g Ysx :%g Ys1 :%g Ys2 :%g Ys3 :%g\n ",z,g,((19.000/9.0000)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])),Ys[time+1][netlist[i].a],Ys[time+2][netlist[i].a],Ys[time+3][netlist[i].a]);
+    //    getch();
     }
 }
 
@@ -184,16 +190,20 @@ void AdamsMoltonC (int i, int time)
         g=((netlist[i].valor)/(stepSize));
     }
     else if (order == 2){ /* PERFEITO */
-        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*((2*netlist[i].valor)/stepSize))+Yc[time+1][i]);
+        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*((2*netlist[i].valor)/stepSize))+Yc[time+1][netlist[i].x]);
         g=(2*(netlist[i].valor)/(stepSize));
+//        printf("g :%g z: %g\n",g,z);
+//        getch();
     }
-    else if (order == 3){ /* Nao está batendo nas casas decimais! Mas os resultados estão bons */
-        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*(((12/5)*netlist[i].valor)/(stepSize)))+((8/5)*Yc[time+1][i])-((1/5)*Yc[time+2][i]));
-        g=((12/5)*(netlist[i].valor)/(stepSize));
+    else if (order == 3){ /* PERFEITO */
+        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*(((12/5)*netlist[i].valor)/stepSize))+ ((8/5)*Yc[time+1][netlist[i].x]) - ((1/5)*Yc[time+2][netlist[i].x])  );
+        g=((12/5)*((netlist[i].valor)/(stepSize)));
     }
     else if (order == 4){ /* ERRO NA ESTAMPA, PROVAVELMENTE SINAL */
-        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*(((24/9)*netlist[i].valor)/stepSize))+((19/9)*Yc[time+1][i])-((5/9)*Yc[time+2][i])+((1/3)*Yc[time+3][i])  );
-        g=((24/9)*(netlist[i].valor)/(stepSize));
+        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*((25/9)*((netlist[i].valor)/(stepSize)))) + ((19/9)*Yc[time+1][netlist[i].x]) - ((5/9)*Yc[time+2][netlist[i].x]) + ((1/9)*Yc[time+3][netlist[i].x]));
+        g=((24/9)*((netlist[i].valor)/(stepSize)));
+ //       printf("z: %g g: %g",z,g);
+ //       getch();
     }
 }
 int main(void)
@@ -236,6 +246,20 @@ int main(void)
     order=atoi(method+4); /* Tem que ser o 4 pq o 5 é o endOfString ADMO"N"  */
     ne--;
     }
+    else if (tipo=='N'){
+      sscanf(p,"%10s%10s%lg%lg%lg%lg%lg%lg%lg%lg",na,nb,&netlist[ne].param1,
+                                            &netlist[ne].param2,
+                                            &netlist[ne].param3,
+                                            &netlist[ne].param4,
+                                            &netlist[ne].param5,
+                                            &netlist[ne].param6,
+                                            &netlist[ne].param7,
+                                            &netlist[ne].valor);
+
+    } /* Paramos aqui. O programa toma os dados do net list e salva porém não os usa para nada.
+     Conferir depois se tá lendo certinho tb*/
+
+
     else if (tipo=='L' || tipo=='C'){
       if ((quant=sscanf(p,"%10s%10s%lg IC=%lg" ,na,nb,&netlist[ne].valor, &netlist[ne].ini))!=4){
         netlist[ne].ini=0; /* caso UIC não seja especificada */
@@ -306,6 +330,10 @@ int main(void)
       strcat(lista[nv],netlist[i].nome);
       netlist[i].x=nv;
     }
+    else if (tipo=='C'){ /* Salva no .x onde estarão salvas as correntes dos capacitores. */
+      icc++;
+      netlist[i].x=icc;
+    }
     else if (tipo=='H') {
       nv=nv+2;
       if (nv>MAX_NOS) {
@@ -367,7 +395,7 @@ int main(void)
 
 
   w=0;
-  while(w<100){ /* While para analise no tempo. Apenas 20 loops para monitorar tudo */
+  while(w<(finalTime/stepSize)){ /* While para analise no tempo. Apenas 100 loops para monitorar tudo */
   /* Zera sistema */
   for (i=0; i<=nv; i++) {
     for (j=0; j<=nv+1; j++)
@@ -541,8 +569,8 @@ int main(void)
 Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
 /* Zera a matriz de saves */
   if(time==3){
-    for (i=0; i<=4; i++) { /* deixei essa rotina por precaução, para não ter valores indefinidos na matriz de saves */
-      for (j=0; j<=nv; j++){ /* zera também a matriz que salva as correntes do capacitor. */
+    for (i=0; i<=5; i++) { /* deixei essa rotina por precaução, para não ter valores indefinidos na matriz de saves */
+      for (j=0; j<=nv+1; j++){ /* zera também a matriz que salva as correntes do capacitor. */
         Ys[i][j]=0;
         Yc[i][j]=0;
       }
@@ -570,26 +598,23 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
   fprintf (arquivo, "\n");
   fclose (arquivo);
 
-
-  for(i=1 ; i<=ne ; i++){ /* rotina que salva as correntes do capacitor na matriz Yc */
+  for(i=1 ; i<=nv ; i++){ /* rotina que salva as correntes do capacitor na matriz Yc */
     tipo=netlist[i].nome[0];
     if (tipo=='C'){
       if(time==3){
-        Yc[time][i]=0;
+        Yc[time][netlist[i].x]=0;
       }
       else if (order == 1){
-        Yc[time][i]=(((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])));
+        Yc[time][netlist[i].x]=(((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])));
       }
       else if (order == 2){
-        Yc[time][i]=( 2*((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-Yc[time+1][i]);
+        Yc[time][netlist[i].x]=( 2*((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-Yc[time+1][netlist[i].x]);
       }
       else if (order == 3){
-        Yc[time][i]=( ((12*(netlist[i].valor)/(5*stepSize))*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])))-((8/5)*Yc[time+1][i])+((1/5)*Yc[time+2][i]));
+        Yc[time][netlist[i].x]=(  ( ((12/5)*((netlist[i].valor)/stepSize) )*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))) - ((8/5)*Yc[time+1][netlist[i].x]) + ((1/5)*Yc[time+2][netlist[i].x]));
       }
       else if (order == 4){ /* Pode ter merda aqui também. */
-        Yc[time][i]=((24/9)*(netlist[i].valor/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((19/9)*Yc[time+1][i])+((5/9)*Yc[time+2][i])-((1/9)*Yc[time+3][i]));
-        printf(" %g %g %g %g %g %g %g ",Yn[netlist[i].a][nv+1],Yn[netlist[i].b][nv+1],Ys[time+1][netlist[i].a],Ys[time+1][netlist[i].b],Yc[time+1][i],Yc[time+2][i],Yc[time+3][i]);
-        getch();
+        Yc[time][i]=( ((24.0000/9.0000)*(netlist[i].valor/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))) - ((19.0000/9.0000)*Yc[time+1][netlist[i].x])+((5.0000/9.0000)*Yc[time+2][netlist[i].x])-((1.0000/9.0000)*Yc[time+3][netlist[i].x]));
       }
     }
   }
@@ -613,16 +638,16 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
         Yc[1][i]=Yc[0][i];
       }
     }
-  // printf("Saves:\n");
-  //  for (i=0; i<=5; i++) { /* deixei essa rotina por precaução, para não ter valores indefinidos na matriz de saves */
-  //    printf("\n saveC%i",i);
-  //    for (j=0; j<=nv; j++){
-  //      if ( tipo == 'C' ){
-  //       /* printf(" %s %g\n ",lista[j],Ys[i][j]); */ /* printa a matriz de saves - debug */
-  //         printf(" %i eh: %g ",j,Yc[i][j]); /* printa a matriz de saves - debug */
-  //      }
-  //    }
-  //  }
+   //printf("Saves:\n");
+   // for (i=0; i<=6; i++) { /* deixei essa rotina por precaução, para não ter valores indefinidos na matriz de saves */
+   //   printf("\n saveC%i",i);
+   //   for (j=0; j<=nv; j++){
+   //     if ( tipo == 'C' ){
+   //      /* printf(" %s %g\n ",lista[j],Ys[i][j]); */ /* printa a matriz de saves - debug */
+   //        printf(" %i eh: %g ",j,Yc[i][j]); /* printa a matriz de saves - debug */
+   //     }
+   //   }
+   // }
 timeA+=stepSize;
 time--;/* um cara problematico, ou não. Vai saber. Não não é */
 w++;/* WHILE demonstrativo para 4 iterações somente. Facilmente ajustado para as iterações necessárias do ADMO */
