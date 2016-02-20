@@ -48,7 +48,7 @@ typedef struct elemento { /* Elemento do netlist */
 elemento netlist[MAX_ELEM]; /* Netlist */
 
 int
-  useInicialConditions = 2,
+  useInicialConditions = 2, 
   quant,
   intSteps,
   order,
@@ -57,7 +57,7 @@ int
   ne, /* Elementos */
   nv, /* Variaveis */
   nn, /* Nos */
-  i,j,k,w;
+  i,j,k;
 
 char
 /* Foram colocados limites nos formatos de leitura para alguma protecao
@@ -79,7 +79,6 @@ double
   stepSize,
   g,
   z,
-  pulseOffTime,
   pulseRealTime,
   Yc[MAX_STEPS+2][MAX_NOS+1], /* Essa matriz ira armazenar os valores das correntes nos capacitores */
   Ys[MAX_STEPS+2][MAX_NOS+1], /* Essa matriz irá armazenar até no máximo 3 valores passados da analise */
@@ -147,7 +146,7 @@ int numero(char *nome)
   }
 }
 
-void AdamsMoltonL (int i, int time) /* ADMO do Indutor Completo! */
+void AdamsMoltonL (int i, int time) /* ADMO do Indutor Completo! Rotina para uso de G e Z dentro da montagem de uma estampa. */
 {
     if (time == 3){
         if(useInicialConditions==1){netlist[i].ini = 0;}
@@ -170,7 +169,7 @@ void AdamsMoltonL (int i, int time) /* ADMO do Indutor Completo! */
       //  printf("z: %g g: %g",z,g);
       //  getch();
     }
-    else if (order == 4){ /* Erro na variável z */
+    else if (order == 4){ 
         z=((((Ys[time+1][netlist[i].x])*((netlist[i].valor)/stepSize))*(24.0000/9.0000))+((19.0000/9.0000)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((5.0000/9.0000)*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b]))+((1.0000/9.0000)*(Ys[time+3][netlist[i].a]-Ys[time+3][netlist[i].b])));
         g=((24.0000/9.0000)*((netlist[i].valor)/stepSize));
      //   printf("z: %g g: %g\n ",z,g);
@@ -392,10 +391,8 @@ int main(void)
   }
   fprintf (arquivo, "\n");
   fclose(arquivo);
-
-
-  w=0;
-  while(w<(finalTime/stepSize)){ /* While para analise no tempo.*/
+  
+  while(timeA<=finalTime){ /* While para analise no tempo.*/
   /* Zera sistema */
   for (i=0; i<=nv; i++) {
     for (j=0; j<=nv+1; j++)
@@ -419,8 +416,8 @@ int main(void)
         Yn[netlist[i].b][netlist[i].b]+=g;
         Yn[netlist[i].a][netlist[i].b]-=g;
         Yn[netlist[i].b][netlist[i].a]-=g;
-        Yn[netlist[i].a][nv+1]+=z; /* DETALHE PARA O SINAL Fonte de corrente sendo Adicionada */
-        Yn[netlist[i].b][nv+1]-=z; /* DETALHE PARA O SINAL Fonte de corrente sendo Adicionada */
+        Yn[netlist[i].a][nv+1]+=z; /* Fonte de corrente sendo Adicionada */
+        Yn[netlist[i].b][nv+1]-=z; /* Fonte de corrente sendo Adicionada */
     }
     else if (tipo=='R') {
       g=1/netlist[i].valor;
@@ -453,18 +450,18 @@ int main(void)
       }
 
       else if ((strcmp(netlist[i].type,"SIN"))==0){
-
+	//Valor antes da senoide oscilar, isto e, antes do tempo de atraso 
             if (timeA<netlist[i].param3){
                 Yn[netlist[i].x][nv+1]-= (  netlist[i].valor +  netlist[i].param1 *
                         sin((M_PI/180)*netlist[i].param5));
             }
-
+	// Valor para depois do numero de ciclos ter se passado
             else if (timeA > (netlist[i].param3 + (netlist[i].param6)*(1/netlist[i].param2)) ) {
                 Yn[netlist[i].x][nv+1]-= (  netlist[i].valor +  netlist[i].param1 * exp(-netlist[i].param4*(netlist[i].param6/netlist[i].param2)) *
                         sin( ((2* M_PI * netlist[i].param2) * (netlist[i].param6/netlist[i].param2)) + (M_PI/180)*netlist[i].param5 ));
 
             }
-
+	//Valor durante a oscilacao
             else{
                 Yn[netlist[i].x][nv+1]-= (  netlist[i].valor +  netlist[i].param1 * exp(-netlist[i].param4*(timeA-netlist[i].param3)) *
                         sin( ((2* M_PI * netlist[i].param2) * (timeA-netlist[i].param3)) + (M_PI/180)*netlist[i].param5 ));
@@ -474,27 +471,31 @@ int main(void)
 
         pulseRealTime=timeA-netlist[i].param2;
         pulseRealTime= fmod(pulseRealTime,netlist[i].param6);
-        pulseOffTime=netlist[i].param6- (netlist[i].param3+netlist[i].param4+netlist[i].param5);
+        //Valor antes do primeiro pulso
         if (timeA<netlist[i].param2){
             Yn[netlist[i].x][nv+1]-=netlist[i].valor;
         }
-
+	//valor depois de todos os ciclos
         else if (timeA> (netlist[i].param2 +(netlist[i].param7*netlist[i].param6) ) ) {
             Yn[netlist[i].x][nv+1]-=netlist[i].valor;
         }
+        //valor caso esteja durante um ciclo
             else {
                         if (pulseRealTime<netlist[i].param3 ){ /* subindo*/
                             Yn[netlist[i].x][nv+1]-=((((netlist[i].param1-netlist[i].valor)/netlist[i].param3)*pulseRealTime)+ netlist[i].valor);
                         }
-                        else if (pulseRealTime< (netlist[i].param3+netlist[i].param5)){
+                        /*Valor durante a Amplitude 2, isto e, pico do pulso */ 
+                        else if (pulseRealTime< (netlist[i].param3+netlist[i].param5)){ 
                             Yn[netlist[i].x][nv+1]-=netlist[i].param1;
                         }
+                        /* Valor durante a descida */
                         else if (pulseRealTime< (netlist[i].param3+netlist[i].param5+netlist[i].param4)){
                             Yn[netlist[i].x][nv+1]-= (netlist[i].param1-
                                                      (((netlist[i].param1-netlist[i].valor)/netlist[i].param4)*
                                                      (pulseRealTime-(netlist[i].param3+netlist[i].param5))));
                             }
-                        else {
+                        /* Valor de amplitude 1 antes de um próximo pulso */    
+                        else { 
                             Yn[netlist[i].x][nv+1]-=netlist[i].valor;
                         }
 
@@ -652,8 +653,7 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
    //   }
    // }
 timeA+=stepSize;
-time--;/* um cara problematico, ou não. Vai saber. Não não é */
-w++;/* WHILE demonstrativo para 4 iterações somente. Facilmente ajustado para as iterações necessárias do ADMO */
+time--;
 }
   getch();
   return 0;
