@@ -40,7 +40,7 @@ Os nos podem ser nomes
 
 typedef struct elemento { /* Elemento do netlist */
   char nome[MAX_NOME],type[MAX_NOME];
-  double valor,ini, param1, param2, param3, param4, param5, param6, param7;
+  double valor,ini, param1, param2, param3, param4, param5, param6, param7,g1,g2,g3,i1,i2,i3;
   int a,b,c,d,x,y;
 
 } elemento;
@@ -48,7 +48,8 @@ typedef struct elemento { /* Elemento do netlist */
 elemento netlist[MAX_ELEM]; /* Netlist */
 
 int
-  useInicialConditions = 2, 
+  goToNewton,
+  useInicialConditions = 2,
   quant,
   intSteps,
   order,
@@ -57,7 +58,7 @@ int
   ne, /* Elementos */
   nv, /* Variaveis */
   nn, /* Nos */
-  i,j,k;
+  i,j,k,w;
 
 char
 /* Foram colocados limites nos formatos de leitura para alguma protecao
@@ -79,9 +80,13 @@ double
   stepSize,
   g,
   z,
+  pulseOffTime,
   pulseRealTime,
   Yc[MAX_STEPS+2][MAX_NOS+1], /* Essa matriz ira armazenar os valores das correntes nos capacitores */
   Ys[MAX_STEPS+2][MAX_NOS+1], /* Essa matriz irá armazenar até no máximo 3 valores passados da analise */
+  Ynr[MAX_NOS+1][MAX_NOS+2],
+  NRCompare[MAX_NOS+1],
+  nrErro[MAX_NOS+1],
   Yn[MAX_NOS+1][MAX_NOS+2];
 
 /* Resolucao de sistema de equacoes lineares.
@@ -124,6 +129,50 @@ int resolversistema(void)
   return 0;
 }
 
+
+int resolversistemaNR(void)
+{
+  int i,j,l, a;
+  double t, p;
+
+  for (i=1; i<=nv; i++) {
+    t=0.0;
+    a=i;
+    for (l=i; l<=nv; l++) {
+      if (fabs(Ynr[l][i])>fabs(t)) {
+	a=l;
+	t=Ynr[l][i];
+      }
+    }
+    if (i!=a) {
+      for (l=1; l<=nv+1; l++) {
+	p=Ynr[i][l];
+	Ynr[i][l]=Ynr[a][l];
+	Ynr[a][l]=p;
+      }
+    }
+    if (fabs(t)<TOLG) {
+      printf("Sistema singular\n");
+      return 1;
+    }
+    for (j=nv+1; j>0; j--) {  /* Basta j>i em vez de j>0 */
+      Ynr[i][j]/= t;
+      p=Ynr[i][j];
+      if (p!=0)  /* Evita operacoes com zero */
+        for (l=1; l<=nv; l++) {
+	  if (l!=i)
+	    Ynr[l][j]-=Ynr[l][i]*p;
+        }
+    }
+  }
+  return 0;
+}
+
+
+
+
+
+
 /* Rotina que conta os nos e atribui numeros a eles */
 int numero(char *nome)
 {
@@ -146,7 +195,7 @@ int numero(char *nome)
   }
 }
 
-void AdamsMoltonL (int i, int time) /* ADMO do Indutor Completo! Rotina para uso de G e Z dentro da montagem de uma estampa. */
+void AdamsMoltonL (int i, int time) /* ADMO do Indutor Completo! */
 {
     if (time == 3){
         if(useInicialConditions==1){netlist[i].ini = 0;}
@@ -169,7 +218,7 @@ void AdamsMoltonL (int i, int time) /* ADMO do Indutor Completo! Rotina para uso
       //  printf("z: %g g: %g",z,g);
       //  getch();
     }
-    else if (order == 4){ 
+    else if (order == 4){ /* Perfeito */
         z=((((Ys[time+1][netlist[i].x])*((netlist[i].valor)/stepSize))*(24.0000/9.0000))+((19.0000/9.0000)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((5.0000/9.0000)*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b]))+((1.0000/9.0000)*(Ys[time+3][netlist[i].a]-Ys[time+3][netlist[i].b])));
         g=((24.0000/9.0000)*((netlist[i].valor)/stepSize));
      //   printf("z: %g g: %g\n ",z,g);
@@ -206,6 +255,12 @@ void AdamsMoltonC (int i, int time)
  //       printf("save0: %g save2: %g save3: %g\n",(Yc[time+1][netlist[i].x]),Yc[time+2][netlist[i].x],Yc[time+3][netlist[i].x]);
  //       getch();
     }
+}
+void newtonRaphson(int i){
+
+
+
+
 }
 int main(void)
 {
@@ -246,8 +301,8 @@ int main(void)
     ne--;
     }
     else if (tipo=='N'){
-      sscanf(p,"%10s%10s%lg%lg%lg%lg%lg%lg%lg%lg",na,nb,&netlist[ne].param1,
-                                            &netlist[ne].param2,
+      sscanf(p,"%10s%10s%lg%lg%lg%lg%lg%lg%lg%lg",na,nb,&netlist[ne].param1, /* primeira angulacao */
+                                            &netlist[ne].param2, /* primeira fonte*/
                                             &netlist[ne].param3,
                                             &netlist[ne].param4,
                                             &netlist[ne].param5,
@@ -255,7 +310,16 @@ int main(void)
                                             &netlist[ne].param7,
                                             &netlist[ne].valor);
 
-    } /* Paramos aqui. O programa toma os dados do net list e salva porém não os usa para nada.
+      netlist[ne].i1 =((((netlist[ne].param4-netlist[ne].param2)/(netlist[ne].param3-netlist[ne].param1))*netlist[ne].param1)+netlist[ne].param2);
+      netlist[ne].g1 =((netlist[ne].param4-netlist[ne].param2)/(netlist[ne].param3-netlist[ne].param1));
+      netlist[ne].i2 =((((netlist[ne].param6-netlist[ne].param4)/(netlist[ne].param5-netlist[ne].param3))*netlist[ne].param5)+netlist[ne].param6);
+      netlist[ne].g2 =((netlist[ne].param6-netlist[ne].param4)/(netlist[ne].param5-netlist[ne].param3));
+      netlist[ne].i3 =((((netlist[ne].valor-netlist[ne].param6)/(netlist[ne].param7-netlist[ne].param5))*netlist[ne].param7)+netlist[ne].valor);
+      netlist[ne].g3 =((netlist[ne].valor-netlist[ne].param6)/(netlist[ne].param7-netlist[ne].param5));
+
+      netlist[ne].a=numero(na);
+      netlist[ne].b=numero(nb);
+    } /*
      Conferir depois se tá lendo certinho tb*/
 
 
@@ -391,9 +455,12 @@ int main(void)
   }
   fprintf (arquivo, "\n");
   fclose(arquivo);
-  
-  while(timeA<=finalTime){ /* While para analise no tempo.*/
+
+
+  w=0;
+  while(w<(finalTime/stepSize)){ /* While para analise no tempo.*/
   /* Zera sistema */
+  goToNewton=0;
   for (i=0; i<=nv; i++) {
     for (j=0; j<=nv+1; j++)
       Yn[i][j]=0;
@@ -416,8 +483,8 @@ int main(void)
         Yn[netlist[i].b][netlist[i].b]+=g;
         Yn[netlist[i].a][netlist[i].b]-=g;
         Yn[netlist[i].b][netlist[i].a]-=g;
-        Yn[netlist[i].a][nv+1]+=z; /* Fonte de corrente sendo Adicionada */
-        Yn[netlist[i].b][nv+1]-=z; /* Fonte de corrente sendo Adicionada */
+        Yn[netlist[i].a][nv+1]+=z; /* DETALHE PARA O SINAL Fonte de corrente sendo Adicionada */
+        Yn[netlist[i].b][nv+1]-=z; /* DETALHE PARA O SINAL Fonte de corrente sendo Adicionada */
     }
     else if (tipo=='R') {
       g=1/netlist[i].valor;
@@ -450,18 +517,18 @@ int main(void)
       }
 
       else if ((strcmp(netlist[i].type,"SIN"))==0){
-	//Valor antes da senoide oscilar, isto e, antes do tempo de atraso 
+
             if (timeA<netlist[i].param3){
                 Yn[netlist[i].x][nv+1]-= (  netlist[i].valor +  netlist[i].param1 *
                         sin((M_PI/180)*netlist[i].param5));
             }
-	// Valor para depois do numero de ciclos ter se passado
+
             else if (timeA > (netlist[i].param3 + (netlist[i].param6)*(1/netlist[i].param2)) ) {
                 Yn[netlist[i].x][nv+1]-= (  netlist[i].valor +  netlist[i].param1 * exp(-netlist[i].param4*(netlist[i].param6/netlist[i].param2)) *
                         sin( ((2* M_PI * netlist[i].param2) * (netlist[i].param6/netlist[i].param2)) + (M_PI/180)*netlist[i].param5 ));
 
             }
-	//Valor durante a oscilacao
+
             else{
                 Yn[netlist[i].x][nv+1]-= (  netlist[i].valor +  netlist[i].param1 * exp(-netlist[i].param4*(timeA-netlist[i].param3)) *
                         sin( ((2* M_PI * netlist[i].param2) * (timeA-netlist[i].param3)) + (M_PI/180)*netlist[i].param5 ));
@@ -471,31 +538,27 @@ int main(void)
 
         pulseRealTime=timeA-netlist[i].param2;
         pulseRealTime= fmod(pulseRealTime,netlist[i].param6);
-        //Valor antes do primeiro pulso
+        pulseOffTime=netlist[i].param6- (netlist[i].param3+netlist[i].param4+netlist[i].param5);
         if (timeA<netlist[i].param2){
             Yn[netlist[i].x][nv+1]-=netlist[i].valor;
         }
-	//valor depois de todos os ciclos
+
         else if (timeA> (netlist[i].param2 +(netlist[i].param7*netlist[i].param6) ) ) {
             Yn[netlist[i].x][nv+1]-=netlist[i].valor;
         }
-        //valor caso esteja durante um ciclo
             else {
                         if (pulseRealTime<netlist[i].param3 ){ /* subindo*/
                             Yn[netlist[i].x][nv+1]-=((((netlist[i].param1-netlist[i].valor)/netlist[i].param3)*pulseRealTime)+ netlist[i].valor);
                         }
-                        /*Valor durante a Amplitude 2, isto e, pico do pulso */ 
-                        else if (pulseRealTime< (netlist[i].param3+netlist[i].param5)){ 
+                        else if (pulseRealTime< (netlist[i].param3+netlist[i].param5)){
                             Yn[netlist[i].x][nv+1]-=netlist[i].param1;
                         }
-                        /* Valor durante a descida */
                         else if (pulseRealTime< (netlist[i].param3+netlist[i].param5+netlist[i].param4)){
                             Yn[netlist[i].x][nv+1]-= (netlist[i].param1-
                                                      (((netlist[i].param1-netlist[i].valor)/netlist[i].param4)*
                                                      (pulseRealTime-(netlist[i].param3+netlist[i].param5))));
                             }
-                        /* Valor de amplitude 1 antes de um próximo pulso */    
-                        else { 
+                        else {
                             Yn[netlist[i].x][nv+1]-=netlist[i].valor;
                         }
 
@@ -533,6 +596,10 @@ int main(void)
       Yn[netlist[i].x][netlist[i].d]+=1;
       Yn[netlist[i].y][netlist[i].x]+=g;
     }
+    else if (tipo=='N'){
+
+     goToNewton++;
+    }
     else if (tipo=='O') {
       Yn[netlist[i].a][netlist[i].x]+=1;
       Yn[netlist[i].b][netlist[i].x]-=1;
@@ -551,6 +618,68 @@ int main(void)
     getch();
 #endif
   }
+
+if (goToNewton!=0){
+
+    // Zera o array de comparação
+   for (i=0;i<=nv;i++){
+    NRCompare[i]=0;
+   }
+
+   for(i=0;i<=nv;i++){
+        for (j=0;<=nv+1;j++){
+            Ynr[i][j]=Yn[i][j];
+        }
+       }
+
+
+   while (repete){
+       repete=0;
+
+
+       for (i=1; i<=ne; i++) {
+        tipo=netlist[i].nome[0];
+        if (tipo=='N'){
+            if (NRCompare[netlist[i].a]-NRCompare[netlist[i].b]< netlist[ne].param3 ){
+               g=netlist[ne].g1;
+               z=netlist[ne].i1;
+
+            }
+            else if (NRCompare[netlist[i].a]-NRCompare[netlist[i].b]<netlist[ne].param5){
+                g=netlist[ne].g2;
+                z=netlist[ne].i2;
+            }
+            else {
+                g=netlist[ne].g3;
+                z=netlist[ne].i3;
+            }
+            Ynr[netlist[i].a][netlist[i].a]+=g;
+            Ynr[netlist[i].b][netlist[i].b]+=g;
+            Ynr[netlist[i].a][netlist[i].b]-=g;
+            Ynr[netlist[i].b][netlist[i].a]-=g;
+            Ynr[netlist[i].a][nv+1]-=z;
+            Ynr[netlist[i].b][nv+1]+=z;
+
+            }
+       }
+       if (resolversistemaNR()) {
+        getch();
+        exit;
+       }
+       for(i=0;i<=nv;i++){
+        nrErro[i]=(Ynr[i][nv+1]-NRCompare[i]);
+        if (nrErro[i]>MAX_ERRO_NR){
+            repete=1;
+        }}
+}
+        Yn[netlist[i].a][netlist[i].a]+=g;
+        Yn[netlist[i].b][netlist[i].b]+=g;
+        Yn[netlist[i].a][netlist[i].b]-=g;
+        Yn[netlist[i].b][netlist[i].a]-=g;
+        Yn[netlist[i].a][nv+1]-=z;
+        Yn[netlist[i].b][nv+1]+=z;
+
+}
   /* Resolve o sistema */
   if (resolversistema()) {
     getch();
@@ -653,7 +782,8 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
    //   }
    // }
 timeA+=stepSize;
-time--;
+time--;/* um cara problematico, ou não. Vai saber. Não não é */
+w++;/* WHILE demonstrativo para 4 iterações somente. Facilmente ajustado para as iterações necessárias do ADMO */
 }
   getch();
   return 0;
