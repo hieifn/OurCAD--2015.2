@@ -31,7 +31,6 @@ Os nos podem ser nomes
 #include <time.h>
 #include <math.h>
 #define MAX_LINHA 80
-#define RAND_MAX 10
 #define MAX_NOME 11
 #define MAX_ELEM 50
 #define MAX_NOS 50
@@ -53,13 +52,13 @@ elemento netlist[MAX_ELEM]; /* Netlist */
 int
   tryAgain=1,
   RaphsonCount=0,
-  repete=0,
+  repete=1,
   goToNewton,
   useInicialConditions = 2,
   quant,
   intSteps,
   order,
-  time = 3, /* variavel para armazenamento  */
+  save = 3, /* variavel para armazenamento  */
   icc = 0, /* Correntes capacitor */
   ne, /* Elementos */
   nv, /* Variaveis */
@@ -157,78 +156,75 @@ int numero(char *nome)
   }
 }
 
-void AdamsMoltonL (int i, int time) /* ADMO do Indutor Completo! */
+void AdamsMoltonL (int i, int save) /* ADMO do Indutor Completo! */
 {
-    if (time == 3){
+    if (save == 3){
         if(useInicialConditions==1){netlist[i].ini = 0;}
         z=(netlist[i].ini*(netlist[i].valor/iStepSize));
         g=netlist[i].valor/iStepSize;
     }
     else if (order == 1){ /* PERFEITO */
-        z=((netlist[i].valor/stepSize)*(Ys[time+1][netlist[i].x]));
+        z=((netlist[i].valor/stepSize)*(Ys[save+1][netlist[i].x]));
         g=(netlist[i].valor/stepSize);
     }
     else if (order == 2){/* PERFEITO */
-        z=((((2.0*netlist[i].valor)/stepSize)*(Ys[time+1][netlist[i].x]))+(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]));
+        z=((((2.0*netlist[i].valor)/stepSize)*(Ys[save+1][netlist[i].x]))+(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b]));
         g=((2.0*netlist[i].valor)/stepSize);
      //   printf("z: %g g: %g\n ",z,g);
      //   getch();
     }
     else if (order == 3){ /* PERFEITO */
-        z=( ((12.0/5.0)*((Ys[time+1][netlist[i].x])*((netlist[i].valor)/(stepSize)))) + ((8.0/5.0)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])) - ((1.0/5.0)*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b])));
+        z=( ((12.0/5.0)*((Ys[save+1][netlist[i].x])*((netlist[i].valor)/(stepSize)))) + ((8.0/5.0)*(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])) - ((1.0/5.0)*(Ys[save+2][netlist[i].a]-Ys[save+2][netlist[i].b])));
         g=((12.0/5.0)*((netlist[i].valor)/stepSize));
       //  printf("z: %g g: %g",z,g);
       //  getch();
     }
     else if (order == 4){ /* Perfeito */
-        z=((((Ys[time+1][netlist[i].x])*((netlist[i].valor)/stepSize))*(24.0000/9.0000))+((19.0000/9.0000)*(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-((5.0000/9.0000)*(Ys[time+2][netlist[i].a]-Ys[time+2][netlist[i].b]))+((1.0000/9.0000)*(Ys[time+3][netlist[i].a]-Ys[time+3][netlist[i].b])));
+        z=((((Ys[save+1][netlist[i].x])*((netlist[i].valor)/stepSize))*(24.0000/9.0000))+((19.0000/9.0000)*(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b]))-((5.0000/9.0000)*(Ys[save+2][netlist[i].a]-Ys[save+2][netlist[i].b]))+((1.0000/9.0000)*(Ys[save+3][netlist[i].a]-Ys[save+3][netlist[i].b])));
         g=((24.0000/9.0000)*((netlist[i].valor)/stepSize));
      //   printf("z: %g g: %g\n ",z,g);
      //   getch();
     }
 }
 
-void AdamsMoltonC (int i, int time)
+void AdamsMoltonC (int i, int save)
 {
-    if (time == 3){
+    if (save == 3){
         if(useInicialConditions==1){netlist[i].ini = 0;}   /* iStpeSize - StepSize inicial para começar a analise */
         z=(netlist[i].ini*(netlist[i].valor/iStepSize)); /* iStpeSize - StepSize inicial para começar a analise */
         g=((netlist[i].valor)/(iStepSize));
     }
     else if (order == 1){ /* PERFEITO */
-        z=((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*(netlist[i].valor/stepSize));
+        z=((Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])*(netlist[i].valor/stepSize));
         g=((netlist[i].valor)/(stepSize));
     }
     else if (order == 2){ /* PERFEITO */
-        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*((2.0*netlist[i].valor)/stepSize))+Yc[time+1][netlist[i].x]);
+        z=(((Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])*((2.0*netlist[i].valor)/stepSize))+Yc[save+1][netlist[i].x]);
         g=(2.0*(netlist[i].valor)/(stepSize));
     //    printf("z :%g g: %g\n",z,g);
     //    getch();
     }
     else if (order == 3){ /* PERFEITO */
-        z=(((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*(((12.0/5.0)*netlist[i].valor)/stepSize))+ ((8.0/5.0)*Yc[time+1][netlist[i].x]) - ((1.0/5.0)*Yc[time+2][netlist[i].x])  );
+        z=(((Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])*(((12.0/5.0)*netlist[i].valor)/stepSize))+ ((8.0/5.0)*Yc[save+1][netlist[i].x]) - ((1.0/5.0)*Yc[save+2][netlist[i].x])  );
         g=((12.0/5.0)*((netlist[i].valor)/(stepSize)));
-//        printf("save0: %g save2: %g save3: %g\n",(Yc[time+1][netlist[i].x]),Yc[time+2][netlist[i].x],Yc[time+3][netlist[i].x]);
+//        printf("save0: %g save2: %g save3: %g\n",(Yc[save+1][netlist[i].x]),Yc[save+2][netlist[i].x],Yc[save+3][netlist[i].x]);
 //        getch();
     }
     else if (order == 4){ /* ERRO NA ESTAMPA, PROVAVELMENTE SINAL */
-        z=(  ((Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])*((24.0000/9.0000)*((netlist[i].valor)/(stepSize)))) + ((19.0000/9.0000)*Yc[time+1][netlist[i].x]) - ((5.0000/9.0000)*Yc[time+2][netlist[i].x]) + ((1.0000/9.0000)*Yc[time+3][netlist[i].x]));
+        z=(  ((Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])*((24.0000/9.0000)*((netlist[i].valor)/(stepSize)))) + ((19.0000/9.0000)*Yc[save+1][netlist[i].x]) - ((5.0000/9.0000)*Yc[save+2][netlist[i].x]) + ((1.0000/9.0000)*Yc[save+3][netlist[i].x]));
         g=((24.0000/9.0000)*((netlist[i].valor)/(stepSize)));
- //       printf("save0: %g save2: %g save3: %g\n",(Yc[time+1][netlist[i].x]),Yc[time+2][netlist[i].x],Yc[time+3][netlist[i].x]);
+ //       printf("save0: %g save2: %g save3: %g\n",(Yc[save+1][netlist[i].x]),Yc[save+2][netlist[i].x],Yc[save+3][netlist[i].x]);
  //       getch();
     }
 }
-void newtonRaphson(int i){
 
-
-
-
-}
 int main(void)
 {
   system("cls");
+  srand( (unsigned)time(NULL) );
   printf("Programa de analise no tempo, pelo metodo de Adams-Molton\n");
   printf("Desenvolvido por : Igor F. Nascimento, Eduardo Naslausky e Alan Carpilovisky\n"); /*Galera troquem deoois !*/
+  printf("Versao %d\n",rand());
   printf("Versao %s\n",versao);
  denovo:
   /* Leitura do netlist */
@@ -272,15 +268,16 @@ int main(void)
                                             &netlist[ne].param7,
                                             &netlist[ne].valor);
 
-      netlist[ne].i1 =((((netlist[ne].param4-netlist[ne].param2)/(netlist[ne].param3-netlist[ne].param1))*netlist[ne].param1)+netlist[ne].param2);
+      netlist[ne].i1 =((((netlist[ne].param4-netlist[ne].param2)/(netlist[ne].param3-netlist[ne].param1))*-netlist[ne].param1)+netlist[ne].param2);
       netlist[ne].g1 =((netlist[ne].param4-netlist[ne].param2)/(netlist[ne].param3-netlist[ne].param1));
-      netlist[ne].i2 =((((netlist[ne].param6-netlist[ne].param4)/(netlist[ne].param5-netlist[ne].param3))*netlist[ne].param5)+netlist[ne].param6);
+      netlist[ne].i2 =((((netlist[ne].param6-netlist[ne].param4)/(netlist[ne].param5-netlist[ne].param3))*-netlist[ne].param3)+netlist[ne].param4);
       netlist[ne].g2 =((netlist[ne].param6-netlist[ne].param4)/(netlist[ne].param5-netlist[ne].param3));
-      netlist[ne].i3 =((((netlist[ne].valor-netlist[ne].param6)/(netlist[ne].param7-netlist[ne].param5))*netlist[ne].param7)+netlist[ne].valor);
+      netlist[ne].i3 =((((netlist[ne].valor-netlist[ne].param6)/(netlist[ne].param7-netlist[ne].param5))*-netlist[ne].param5)+netlist[ne].param6);
       netlist[ne].g3 =((netlist[ne].valor-netlist[ne].param6)/(netlist[ne].param7-netlist[ne].param5));
 
       netlist[ne].a=numero(na);
       netlist[ne].b=numero(nb);
+      printf("%s %s %s P1<%g,%g> P2<%g,%g> P3<%g,%g> P4<%g,%g>\n",netlist[ne].nome,na,nb,netlist[ne].param1,netlist[ne].param2,netlist[ne].param3,netlist[ne].param4,netlist[ne].param5,netlist[ne].param6,netlist[ne].param7,netlist[ne].valor);
     } /*
      Conferir depois se tá lendo certinho tb*/
 
@@ -392,6 +389,9 @@ int main(void)
     else if (tipo=='O') {
       printf("%s %d %d %d %d\n",netlist[i].nome,netlist[i].a,netlist[i].b,netlist[i].c,netlist[i].d);
     }
+    else if (tipo=='N') {
+      printf("%s %d %d %g %g %g %g %g %g\n",netlist[i].nome,netlist[i].a,netlist[i].b,netlist[i].i1,netlist[i].g1,netlist[i].i2,netlist[i].g2,netlist[i].i3,netlist[i].g3);
+    }
     if (tipo=='V' || tipo=='E' || tipo=='F' || tipo=='O'){
       printf("Corrente jx: %d\n",netlist[i].x);
       }
@@ -425,14 +425,14 @@ int main(void)
   goToNewton=0;
   for (i=0; i<=nv; i++) {
         NRCompare[i]=0;// ja zera logo aqui essa merda, e evita um for la em baixo.
-    for (j=0; j<=nv+1; j++)
-      Yn[i][j]=0;
+        for (j=0; j<=nv+1; j++)
+            Yn[i][j]=0;
   }
   /* Monta estampas */
   for (i=1; i<=ne; i++) {
     tipo=netlist[i].nome[0];
     if(tipo=='L'){
-        AdamsMoltonL(i,time);
+        AdamsMoltonL(i,save);
         Yn[netlist[i].a][netlist[i].x]+=1;
         Yn[netlist[i].b][netlist[i].x]-=1;
         Yn[netlist[i].x][netlist[i].a]-=1;
@@ -441,7 +441,7 @@ int main(void)
         Yn[netlist[i].x][nv+1]+=z;          /* Fonte de corrente sendo Adicionada */
     }
     else if(tipo=='C'){
-        AdamsMoltonC(i,time);
+        AdamsMoltonC(i,save);
         Yn[netlist[i].a][netlist[i].a]+=g;
         Yn[netlist[i].b][netlist[i].b]+=g;
         Yn[netlist[i].a][netlist[i].b]-=g;
@@ -483,18 +483,18 @@ int main(void)
 
             if (timeA<netlist[i].param3){
                 Yn[netlist[i].x][nv+1]-= (  netlist[i].valor +  netlist[i].param1 *
-                        sin((M_PI/180)*netlist[i].param5));
+                        sin((M_PI/180.0)*netlist[i].param5));
             }
 
             else if (timeA > (netlist[i].param3 + (netlist[i].param6)*(1/netlist[i].param2)) ) {
                 Yn[netlist[i].x][nv+1]-= (  netlist[i].valor +  netlist[i].param1 * exp(-netlist[i].param4*(netlist[i].param6/netlist[i].param2)) *
-                        sin( ((2* M_PI * netlist[i].param2) * (netlist[i].param6/netlist[i].param2)) + (M_PI/180)*netlist[i].param5 ));
+                        sin( ((2.0* M_PI * netlist[i].param2) * (netlist[i].param6/netlist[i].param2)) + (M_PI/180.0)*netlist[i].param5 ));
 
             }
 
             else{
                 Yn[netlist[i].x][nv+1]-= (  netlist[i].valor +  netlist[i].param1 * exp(-netlist[i].param4*(timeA-netlist[i].param3)) *
-                        sin( ((2* M_PI * netlist[i].param2) * (timeA-netlist[i].param3)) + (M_PI/180)*netlist[i].param5 ));
+                        sin( ((2.0* M_PI * netlist[i].param2) * (timeA-netlist[i].param3)) + (M_PI/180.0)*netlist[i].param5 ));
             }}
 
       else if ((strcmp(netlist[i].type,"PULSE"))==0){
@@ -583,10 +583,12 @@ int main(void)
   }
 
 if (goToNewton!=0){ // Problema: Deixar ele sempre começar com teste inicial 0 ou tentar herdar o ultimo valor calculado no tempo ?
+    RaphsonCount=0;
+    tryAgain=0;
 
    while (repete){ // Rever aproximações MAX_ERRO e tryAgain o o range do Rand.
     repete=0;
-     
+    printf("%i \n", RaphsonCount);
      for(i=0; i<=nv;i++){
         for (j=0; j<=nv+1;j++){
             if (RaphsonCount==0){
@@ -596,17 +598,19 @@ if (goToNewton!=0){ // Problema: Deixar ele sempre começar com teste inicial 0 
                 Yn[i][j]=Ynr[i][j];
             }
         }
-     }       
-       RaphsonCount++;
-        if(RaphsonCount*tryAgain>20*tryAgain){ // 20 tentativas de aproximação já está bom ?
+     }
+    RaphsonCount++;
+        if(RaphsonCount>20){// 20 tentativas de aproximação já está bom ?
+            RaphsonCount=0;
             tryAgain++;
             if (tryAgain>6) { // tentar denovo o ponto inicial só 6 vezes ?
-              printf("O componente não-linear não convergiu.");
+              printf("O componente nao convergiu.\n");
               getch();
               exit;
             }
            for(i=0;i<=nv;i++){
-            NRCompare[i]=(rand()-5 );//Gera valores aleatorios de -5 até 5
+            NRCompare[i]=((rand()%10)-5 );//Gera valores aleatorios de -5 até 5
+            printf("novo random %i, %g \n", i, NRCompare[i]);
            }
         }
 
@@ -635,11 +639,8 @@ if (goToNewton!=0){ // Problema: Deixar ele sempre começar com teste inicial 0 
 
             }
        }
-       
-      if (resolversistema()) {/* A merda aqui é que depois que ele lineariza, não tem volta. */
-        getch();
-        exit;
-      }
+
+      resolversistema();/* A merda aqui é que depois que ele lineariza, não tem volta. */
 
        for(i=0;i<=nv;i++){
         nrErro[i]=(Yn[i][nv+1]-NRCompare[i]);
@@ -648,12 +649,13 @@ if (goToNewton!=0){ // Problema: Deixar ele sempre começar com teste inicial 0 
             }
        NRCompare[i]=Yn[i][nv+1];
        }
-   
+
    }
 }
 
   /* Resolve o sistema */
-    if(goToNewton=0){
+//    printf(" goto %i\n", goToNewton );
+    if(goToNewton==0){
       if (resolversistema()) {
         getch();
         exit;
@@ -672,7 +674,7 @@ if (goToNewton!=0){ // Problema: Deixar ele sempre começar com teste inicial 0 
 #endif
 Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
 /* Zera a matriz de saves */
-  if(time==3){
+  if(save==3){
     for (i=0; i<=5; i++) { /* deixei essa rotina por precaução, para não ter valores indefinidos na matriz de saves */
       for (j=0; j<=nv+1; j++){ /* zera também a matriz que salva as correntes do capacitor. */
         Ys[i][j]=0;
@@ -693,7 +695,7 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
     if (i==nn+1){
       strcpy(txt,"Corrente");
     }
-    Ys[time][i]=Yn[i][nv+1]; /* Aproveitei que ele já estava listando tudo e copio o valor para a matriz Ys */
+    Ys[save][i]=Yn[i][nv+1]; /* Aproveitei que ele já estava listando tudo e copio o valor para a matriz Ys */
     #ifdef DEBUG
     printf("%s %s: %g\n",txt,lista[i],Yn[i][nv+1]);
     #endif // DEBUG
@@ -705,27 +707,27 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
   for(i=1 ; i<=nv ; i++){ /* rotina que salva as correntes do capacitor na matriz Yc */
     tipo=netlist[i].nome[0];
     if (tipo=='C'){
-      if(time==3){
-        Yc[time][netlist[i].x]=0;
+      if(save==3){
+        Yc[save][netlist[i].x]=0;
       }
       else if (order == 1){
-        Yc[time][netlist[i].x]=(((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])));
+        Yc[save][netlist[i].x]=(((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])));
       }
       else if (order == 2){
-        Yc[time][netlist[i].x]=( 2.0*((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))-Yc[time+1][netlist[i].x]);
+        Yc[save][netlist[i].x]=( 2.0*((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b]))-Yc[save+1][netlist[i].x]);
       }
       else if (order == 3){
-        Yc[time][netlist[i].x]=(  ( ((12.0/5.0)*((netlist[i].valor)/stepSize) )*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b]))) - ((8.0/5.0)*Yc[time+1][netlist[i].x]) + ((1.0/5.0)*Yc[time+2][netlist[i].x]));
+        Yc[save][netlist[i].x]=(  ( ((12.0/5.0)*((netlist[i].valor)/stepSize) )*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b]))) - ((8.0/5.0)*Yc[save+1][netlist[i].x]) + ((1.0/5.0)*Yc[save+2][netlist[i].x]));
       }
       else if (order == 4){ /* Pode ter merda aqui também. */
-        Yc[time][netlist[i].x]=( ( ((24.0/9.0)*((netlist[i].valor)/stepSize) )*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[time+1][netlist[i].a]-Ys[time+1][netlist[i].b])))- ((19.0/9.0)*Yc[time+1][netlist[i].x])+((5.0/9.0)*Yc[time+2][netlist[i].x])-((1.0/9.0)*Yc[time+3][netlist[i].x]));
-   //     printf("%g\n",Yc[time][netlist[i].x]);
+        Yc[save][netlist[i].x]=( ( ((24.0/9.0)*((netlist[i].valor)/stepSize) )*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])))- ((19.0/9.0)*Yc[save+1][netlist[i].x])+((5.0/9.0)*Yc[save+2][netlist[i].x])-((1.0/9.0)*Yc[save+3][netlist[i].x]));
+   //     printf("%g\n",Yc[save][netlist[i].x]);
    //     getch();
       }
     }
   }
   /* Rotina Para extender as condições iniciais para t(-1) e t(-2) Ys e Yc para para o caso INICIAL ; PODE JUNTAR ESSA ROTINA NO FOR ACIMA*/
-    if (time==3){
+    if (save==3){
       for (i=1; i<=nv; i++) {
         Ys[4][i]=Ys[3][i]; /* Copia os valores iniciais para os slots extras no tempo */
         Yc[4][i]=Yc[3][i]; /* Copia os valores das correntes dos cap. iniciais para os slots extras no tempo */
@@ -734,7 +736,7 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
       }
     }
 
-    if (time == 0){ /* rotina que da shift nos valores de Yc e Ys; PODE JUNTAR ESSA ROTINA EM UM FOR ACIMA !*/
+    if (save == 0){ /* rotina que da shift nos valores de Yc e Ys; PODE JUNTAR ESSA ROTINA EM UM FOR ACIMA !*/
       for (i=1; i<=nv;i++){
         Ys[3][i]=Ys[2][i];
         Yc[3][i]=Yc[2][i];
@@ -743,7 +745,7 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
         Ys[1][i]=Ys[0][i];
         Yc[1][i]=Yc[0][i];
       }
-      time=1;
+      save=1;
     }
    //printf("Saves:\n");
    // for (i=0; i<=6; i++) { /* deixei essa rotina por precaução, para não ter valores indefinidos na matriz de saves */
@@ -756,7 +758,7 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
    //   }
    // }
 timeA+=stepSize;
-time--;/* um cara problematico, ou não. Vai saber. Não não é */
+save--;/* um cara problematico, ou não. Vai saber. Não não é */
 w++;/* WHILE demonstrativo para 4 iterações somente. Facilmente ajustado para as iterações necessárias do ADMO */
 }
   getch();
