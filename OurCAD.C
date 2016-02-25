@@ -28,13 +28,16 @@ Os nos podem ser nomes
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <time.h>
 #include <math.h>
 #define MAX_LINHA 80
+#define RAND_MAX 10
 #define MAX_NOME 11
 #define MAX_ELEM 50
 #define MAX_NOS 50
 #define TOLG 1e-9
 #define TOLG2 3e-20
+#define MAX_ERRO_NR 2e-2
 //#define DEBUG
 #define MAX_STEPS 4
 
@@ -48,6 +51,9 @@ typedef struct elemento { /* Elemento do netlist */
 elemento netlist[MAX_ELEM]; /* Netlist */
 
 int
+  tryAgain=1,
+  RaphsonCount=0,
+  repete=0,
   goToNewton,
   useInicialConditions = 2,
   quant,
@@ -128,50 +134,6 @@ int resolversistema(void)
   }
   return 0;
 }
-
-
-int resolversistemaNR(void)
-{
-  int i,j,l, a;
-  double t, p;
-
-  for (i=1; i<=nv; i++) {
-    t=0.0;
-    a=i;
-    for (l=i; l<=nv; l++) {
-      if (fabs(Ynr[l][i])>fabs(t)) {
-	a=l;
-	t=Ynr[l][i];
-      }
-    }
-    if (i!=a) {
-      for (l=1; l<=nv+1; l++) {
-	p=Ynr[i][l];
-	Ynr[i][l]=Ynr[a][l];
-	Ynr[a][l]=p;
-      }
-    }
-    if (fabs(t)<TOLG) {
-      printf("Sistema singular\n");
-      return 1;
-    }
-    for (j=nv+1; j>0; j--) {  /* Basta j>i em vez de j>0 */
-      Ynr[i][j]/= t;
-      p=Ynr[i][j];
-      if (p!=0)  /* Evita operacoes com zero */
-        for (l=1; l<=nv; l++) {
-	  if (l!=i)
-	    Ynr[l][j]-=Ynr[l][i]*p;
-        }
-    }
-  }
-  return 0;
-}
-
-
-
-
-
 
 /* Rotina que conta os nos e atribui numeros a eles */
 int numero(char *nome)
@@ -462,6 +424,7 @@ int main(void)
   /* Zera sistema */
   goToNewton=0;
   for (i=0; i<=nv; i++) {
+        NRCompare[i]=0;// ja zera logo aqui essa merda, e evita um for la em baixo.
     for (j=0; j<=nv+1; j++)
       Yn[i][j]=0;
   }
@@ -619,33 +582,43 @@ int main(void)
 #endif
   }
 
-if (goToNewton!=0){
+if (goToNewton!=0){ // Problema: Deixar ele sempre começar com teste inicial 0 ou tentar herdar o ultimo valor calculado no tempo ?
 
-    // Zera o array de comparação
-   for (i=0;i<=nv;i++){
-    NRCompare[i]=0;
-   }
-
-   for(i=0;i<=nv;i++){
-        for (j=0;<=nv+1;j++){
-            Ynr[i][j]=Yn[i][j];
+   while (repete){ // Rever aproximações MAX_ERRO e tryAgain o o range do Rand.
+    repete=0;
+     
+     for(i=0; i<=nv;i++){
+        for (j=0; j<=nv+1;j++){
+            if (RaphsonCount==0){
+                Ynr[i][j]=Yn[i][j];
+            }
+            else{
+                Yn[i][j]=Ynr[i][j];
+            }
         }
-       }
-
-
-   while (repete){
-       repete=0;
-
+     }       
+       RaphsonCount++;
+        if(RaphsonCount*tryAgain>20*tryAgain){ // 20 tentativas de aproximação já está bom ?
+            tryAgain++;
+            if (tryAgain>6) { // tentar denovo o ponto inicial só 6 vezes ?
+              printf("O componente não-linear não convergiu.");
+              getch();
+              exit;
+            }
+           for(i=0;i<=nv;i++){
+            NRCompare[i]=(rand()-5 );//Gera valores aleatorios de -5 até 5
+           }
+        }
 
        for (i=1; i<=ne; i++) {
         tipo=netlist[i].nome[0];
         if (tipo=='N'){
-            if (NRCompare[netlist[i].a]-NRCompare[netlist[i].b]< netlist[ne].param3 ){
+            if ((NRCompare[netlist[i].a]-NRCompare[netlist[i].b])< netlist[ne].param3 ){
                g=netlist[ne].g1;
                z=netlist[ne].i1;
 
             }
-            else if (NRCompare[netlist[i].a]-NRCompare[netlist[i].b]<netlist[ne].param5){
+            else if ((NRCompare[netlist[i].a]-NRCompare[netlist[i].b])< netlist[ne].param5 ){
                 g=netlist[ne].g2;
                 z=netlist[ne].i2;
             }
@@ -653,40 +626,39 @@ if (goToNewton!=0){
                 g=netlist[ne].g3;
                 z=netlist[ne].i3;
             }
-            Ynr[netlist[i].a][netlist[i].a]+=g;
-            Ynr[netlist[i].b][netlist[i].b]+=g;
-            Ynr[netlist[i].a][netlist[i].b]-=g;
-            Ynr[netlist[i].b][netlist[i].a]-=g;
-            Ynr[netlist[i].a][nv+1]-=z;
-            Ynr[netlist[i].b][nv+1]+=z;
+            Yn[netlist[i].a][netlist[i].a]+=g;
+            Yn[netlist[i].b][netlist[i].b]+=g;
+            Yn[netlist[i].a][netlist[i].b]-=g;
+            Yn[netlist[i].b][netlist[i].a]-=g;
+            Yn[netlist[i].a][nv+1]-=z;
+            Yn[netlist[i].b][nv+1]+=z;
 
             }
        }
-       if (resolversistemaNR()) {
+       
+      if (resolversistema()) {/* A merda aqui é que depois que ele lineariza, não tem volta. */
         getch();
         exit;
-       }
-       for(i=0;i<=nv;i++){
-	        nrErro[i]=(Ynr[i][nv+1]-NRCompare[i]);
-	        if (nrErro[i]>MAX_ERRO_NR){
-	            repete=1;
-	        }
-	       	NRCompare[i]=Ynr[i][nv+1];
-       }
-}
-        Yn[netlist[i].a][netlist[i].a]+=g;
-        Yn[netlist[i].b][netlist[i].b]+=g;
-        Yn[netlist[i].a][netlist[i].b]-=g;
-        Yn[netlist[i].b][netlist[i].a]-=g;
-        Yn[netlist[i].a][nv+1]-=z;
-        Yn[netlist[i].b][nv+1]+=z;
+      }
 
+       for(i=0;i<=nv;i++){
+        nrErro[i]=(Yn[i][nv+1]-NRCompare[i]);
+            if (nrErro[i]>MAX_ERRO_NR){
+                repete=1;
+            }
+       NRCompare[i]=Yn[i][nv+1];
+       }
+   
+   }
 }
+
   /* Resolve o sistema */
-  if (resolversistema()) {
-    getch();
-    exit;
-  }
+    if(goToNewton=0){
+      if (resolversistema()) {
+        getch();
+        exit;
+      }
+     }
 #ifdef DEBUG
   /* Opcional: Mostra o sistema resolvido */
   printf("Sistema resolvido:\n");
