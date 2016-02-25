@@ -667,10 +667,12 @@ if (goToNewton!=0){
         exit;
        }
        for(i=0;i<=nv;i++){
-        nrErro[i]=(Ynr[i][nv+1]-NRCompare[i]);
-        if (nrErro[i]>MAX_ERRO_NR){
-            repete=1;
-        }}
+	        nrErro[i]=(Ynr[i][nv+1]-NRCompare[i]);
+	        if (nrErro[i]>MAX_ERRO_NR){
+	            repete=1;
+	        }
+	       	NRCompare[i]=Ynr[i][nv+1];
+       }
 }
         Yn[netlist[i].a][netlist[i].a]+=g;
         Yn[netlist[i].b][netlist[i].b]+=g;
