@@ -36,7 +36,7 @@ Os nos podem ser nomes
 #define MAX_NOS 50
 #define TOLG 1e-9
 #define TOLG2 3e-20
-#define MAX_ERRO_NR 2e-2
+#define MAX_ERRO_NR 1e-29
 //#define DEBUG
 #define MAX_STEPS 4
 
@@ -60,10 +60,11 @@ int
   order,
   save = 3, /* variavel para armazenamento  */
   icc = 0, /* Correntes capacitor */
+  ns,
   ne, /* Elementos */
   nv, /* Variaveis */
   nn, /* Nos */
-  i,j,k,w;
+  i,j,k;
 
 char
 /* Foram colocados limites nos formatos de leitura para alguma protecao
@@ -193,6 +194,7 @@ void AdamsMoltonC (int i, int save)
         if(useInicialConditions==1){netlist[i].ini = 0;}   /* iStpeSize - StepSize inicial para começar a analise */
         z=(netlist[i].ini*(netlist[i].valor/iStepSize)); /* iStpeSize - StepSize inicial para começar a analise */
         g=((netlist[i].valor)/(iStepSize));
+
     }
     else if (order == 1){ /* PERFEITO */
         z=((Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])*(netlist[i].valor/stepSize));
@@ -223,9 +225,9 @@ int main(void)
   system("cls");
   srand( (unsigned)time(NULL) );
   printf("Programa de analise no tempo, pelo metodo de Adams-Molton\n");
-  printf("Desenvolvido por : Igor F. Nascimento, Eduardo Naslausky e Alan Carpilovisky\n"); /*Galera troquem deoois !*/
+  printf("Desenvolvido por : Igor F. Nascimento, Eduardo Naslausky e Alan Carpilovsky\n"); /*Galera troquem deoois !*/
   printf("Versao %d\n",rand());
-  printf("Versao %s\n",versao);
+  //printf("Versao %s\n",versao);
  denovo:
   /* Leitura do netlist */
   ne=0; nv=0; strcpy(lista[0],"0");
@@ -258,9 +260,21 @@ int main(void)
     order=atoi(method+4); /* Tem que ser o 4 pq o 5 é o endOfString ADMO"N"  */
     ne--;
     }
+    else if (tipo=='$'){
+      sscanf(p,"%10s%10s%10s%10s%lg%lg%lg",na,nb,nc,nd,
+                                            &netlist[ne].param1,
+                                            &netlist[ne].param2,
+                                            &netlist[ne].param3);
+        printf("%s %s controle1:%s controle2:%s %g\n",netlist[ne].nome,na,nb,netlist[ne].valor);
+        netlist[ne].a=numero(na);
+        netlist[ne].b=numero(nb);
+        netlist[ne].c=numero(nc);
+        netlist[ne].d=numero(nd);
+
+    }
     else if (tipo=='N'){
-      sscanf(p,"%10s%10s%lg%lg%lg%lg%lg%lg%lg%lg",na,nb,&netlist[ne].param1, /* primeira angulacao */
-                                            &netlist[ne].param2, /* primeira fonte*/
+      sscanf(p,"%10s%10s%lg%lg%lg%lg%lg%lg%lg%lg",na,nb,&netlist[ne].param1,
+                                            &netlist[ne].param2,
                                             &netlist[ne].param3,
                                             &netlist[ne].param4,
                                             &netlist[ne].param5,
@@ -277,7 +291,8 @@ int main(void)
 
       netlist[ne].a=numero(na);
       netlist[ne].b=numero(nb);
-      printf("%s %s %s P1<%g,%g> P2<%g,%g> P3<%g,%g> P4<%g,%g>\n",netlist[ne].nome,na,nb,netlist[ne].param1,netlist[ne].param2,netlist[ne].param3,netlist[ne].param4,netlist[ne].param5,netlist[ne].param6,netlist[ne].param7,netlist[ne].valor);
+      printf("%s %s %s P1<%g,%g> P2<%g,%g> P3<%g,%g> P4<%g,%g>\n ",netlist[ne].nome,na,nb,netlist[ne].param1,netlist[ne].param2,netlist[ne].param3,netlist[ne].param4,netlist[ne].param5,netlist[ne].param6,netlist[ne].param7,netlist[ne].valor);
+    //  printf("i1  %g  g1 %g i2 %g g2 %g i3 %g g3 %g \n", netlist[ne].i1, netlist[ne].g1, netlist[ne].i2, netlist[ne].g2, netlist[ne].i3, netlist[ne].g3);
     } /*
      Conferir depois se tá lendo certinho tb*/
 
@@ -338,6 +353,8 @@ int main(void)
     }
   }
   fclose(arquivo);
+
+
   /* Acrescenta variaveis de corrente acima dos nos, anotando no netlist */
   nn=nv;
   for (i=1; i<=ne; i++) {
@@ -369,6 +386,8 @@ int main(void)
     }
   }
   getch();
+
+
   /* Lista tudo */
   printf("Variaveis internas: \n");
   for (i=0; i<=nv; i++)
@@ -417,17 +436,42 @@ int main(void)
   }
   fprintf (arquivo, "\n");
   fclose(arquivo);
+  while(timeA<finalTime){ /* While para analise no tempo.*/
 
 
-  w=0;
-  while(w<(finalTime/stepSize)){ /* While para analise no tempo.*/
+
+/*        ns=nv;
+        if (save==3){
+          for (i=1; i<=ne; i++) {
+            tipo=netlist[i].nome[0];
+                if (tipo=='C') {
+                  nv++;
+                  if (nv>MAX_NOS) {
+                    printf("As correntes extra excederam o numero de variaveis permitido (%d)\n",MAX_NOS);
+                    exit(1);
+                  }
+                  strcpy(lista[nv],"j");
+                  strcat(lista[nv],netlist[i].nome);
+                  netlist[i].y=nv;
+                }
+          }
+        }
+    */
+
   /* Zera sistema */
   goToNewton=0;
   for (i=0; i<=nv; i++) {
-        NRCompare[i]=0;// ja zera logo aqui essa merda, e evita um for la em baixo.
+        NRCompare[i]=((rand()%101)-50);// ja zera logo aqui essa merda, e evita um for la em baixo.
         for (j=0; j<=nv+1; j++)
             Yn[i][j]=0;
   }
+
+
+  //    if (save=2){ // faz o sistema retornar ao normal.
+  //      nv=ns;
+  //    }
+
+
   /* Monta estampas */
   for (i=1; i<=ne; i++) {
     tipo=netlist[i].nome[0];
@@ -441,13 +485,13 @@ int main(void)
         Yn[netlist[i].x][nv+1]+=z;          /* Fonte de corrente sendo Adicionada */
     }
     else if(tipo=='C'){
-        AdamsMoltonC(i,save);
-        Yn[netlist[i].a][netlist[i].a]+=g;
-        Yn[netlist[i].b][netlist[i].b]+=g;
-        Yn[netlist[i].a][netlist[i].b]-=g;
-        Yn[netlist[i].b][netlist[i].a]-=g;
-        Yn[netlist[i].a][nv+1]+=z; /* DETALHE PARA O SINAL Fonte de corrente sendo Adicionada */
-        Yn[netlist[i].b][nv+1]-=z; /* DETALHE PARA O SINAL Fonte de corrente sendo Adicionada */
+      AdamsMoltonC(i,save);
+      Yn[netlist[i].a][netlist[i].a]+=g;
+      Yn[netlist[i].b][netlist[i].b]+=g;
+      Yn[netlist[i].a][netlist[i].b]-=g;
+      Yn[netlist[i].b][netlist[i].a]-=g;
+      Yn[netlist[i].a][nv+1]+=z; /* DETALHE PARA O SINAL Fonte de corrente sendo Adicionada */
+      Yn[netlist[i].b][nv+1]-=z; /* DETALHE PARA O SINAL Fonte de corrente sendo Adicionada */
     }
     else if (tipo=='R') {
       g=1/netlist[i].valor;
@@ -559,7 +603,7 @@ int main(void)
       Yn[netlist[i].x][netlist[i].d]+=1;
       Yn[netlist[i].y][netlist[i].x]+=g;
     }
-    else if (tipo=='N'){
+    else if (tipo=='N' || tipo=='$'){
 
      goToNewton++;
     }
@@ -585,20 +629,25 @@ int main(void)
 if (goToNewton!=0){ // Problema: Deixar ele sempre começar com teste inicial 0 ou tentar herdar o ultimo valor calculado no tempo ?
     RaphsonCount=0;
     tryAgain=0;
-
+    repete=1;
    while (repete){ // Rever aproximações MAX_ERRO e tryAgain o o range do Rand.
     repete=0;
-    printf("%i \n", RaphsonCount);
-     for(i=0; i<=nv;i++){
-        for (j=0; j<=nv+1;j++){
-            if (RaphsonCount==0){
+    //printf("RC: %i \n", RaphsonCount);
+     if (RaphsonCount==0){
+        for(i=0; i<=nv;i++){
+            for (j=0; j<=nv+1;j++){
                 Ynr[i][j]=Yn[i][j];
-            }
-            else{
-                Yn[i][j]=Ynr[i][j];
             }
         }
      }
+    else{
+        for(i=0; i<=nv;i++){
+            for (j=0; j<=nv+1;j++){
+                Yn[i][j]=Ynr[i][j];
+            }
+            //printf("g:%g  z:%g  \n",g,z);
+        }
+    }
     RaphsonCount++;
         if(RaphsonCount>20){// 20 tentativas de aproximação já está bom ?
             RaphsonCount=0;
@@ -616,19 +665,40 @@ if (goToNewton!=0){ // Problema: Deixar ele sempre começar com teste inicial 0 
 
        for (i=1; i<=ne; i++) {
         tipo=netlist[i].nome[0];
+        if (tipo=='$'){
+            if ((NRCompare[netlist[i].c]-NRCompare[netlist[i].d])<netlist[ne].param3){
+              Yn[netlist[i].a][netlist[i].a]+=netlist[ne].param2;
+              Yn[netlist[i].b][netlist[i].b]+=netlist[ne].param2;
+              Yn[netlist[i].a][netlist[i].b]-=netlist[ne].param2;
+              Yn[netlist[i].b][netlist[i].a]-=netlist[ne].param2;
+            }
+            else {
+              Yn[netlist[i].a][netlist[i].a]+=netlist[ne].param1;
+              Yn[netlist[i].b][netlist[i].b]+=netlist[ne].param1;
+              Yn[netlist[i].a][netlist[i].b]-=netlist[ne].param1;
+              Yn[netlist[i].b][netlist[i].a]-=netlist[ne].param1;
+            }
+
+        }
         if (tipo=='N'){
-            if ((NRCompare[netlist[i].a]-NRCompare[netlist[i].b])< netlist[ne].param3 ){
+     //       printf("tensao em cima dele %g \n", NRCompare[netlist[i].a]-NRCompare[netlist[i].b]);
+            if ( (NRCompare[netlist[i].a]-NRCompare[netlist[i].b]) < netlist[ne].param3 ){
                g=netlist[ne].g1;
                z=netlist[ne].i1;
-
+              printf("g1:%g  z1:%g  \n",g,z);
+             // getch();
             }
             else if ((NRCompare[netlist[i].a]-NRCompare[netlist[i].b])< netlist[ne].param5 ){
                 g=netlist[ne].g2;
                 z=netlist[ne].i2;
+                printf("g2:%g  z2:%g  \n",g,z);
+               // getch();
             }
             else {
                 g=netlist[ne].g3;
                 z=netlist[ne].i3;
+                printf("g3:%g  z3:%g  \n",g,z);
+               // getch();
             }
             Yn[netlist[i].a][netlist[i].a]+=g;
             Yn[netlist[i].b][netlist[i].b]+=g;
@@ -636,14 +706,27 @@ if (goToNewton!=0){ // Problema: Deixar ele sempre começar com teste inicial 0 
             Yn[netlist[i].b][netlist[i].a]-=g;
             Yn[netlist[i].a][nv+1]-=z;
             Yn[netlist[i].b][nv+1]+=z;
-
+           // getch();
             }
-       }
+/*
+                  printf("Sistema apos a estampa nao linear de %s\n",netlist[i].nome);
+                    for (k=1; k<=nv; k++) {
+                      for (j=1; j<=nv+1; j++)
+                        if (Yn[k][j]!=0) printf("%+3.1f ",Yn[k][j]);
+                        else printf(" ... ");
+                      printf("\n");
+                    }
+                   // getch();
+                   */
+    }
+      if (resolversistema()) {
+        getch();
+        exit;
+      }
 
-      resolversistema();/* A merda aqui é que depois que ele lineariza, não tem volta. */
-
-       for(i=0;i<=nv;i++){
+       for(i=0;i<=nn;i++){
         nrErro[i]=(Yn[i][nv+1]-NRCompare[i]);
+  //      printf("Erro: %g \n", nrErro[i]);
             if (nrErro[i]>MAX_ERRO_NR){
                 repete=1;
             }
@@ -708,7 +791,7 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
     tipo=netlist[i].nome[0];
     if (tipo=='C'){
       if(save==3){
-        Yc[save][netlist[i].x]=0;
+        Yc[save][netlist[i].x]=(Yn[netlist[i].y][nv+1]); /*  <- testar   */
       }
       else if (order == 1){
         Yc[save][netlist[i].x]=(((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])));
@@ -728,7 +811,7 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
   }
   /* Rotina Para extender as condições iniciais para t(-1) e t(-2) Ys e Yc para para o caso INICIAL ; PODE JUNTAR ESSA ROTINA NO FOR ACIMA*/
     if (save==3){
-      for (i=1; i<=nv; i++) {
+      for (i=0; i<=nv; i++) {
         Ys[4][i]=Ys[3][i]; /* Copia os valores iniciais para os slots extras no tempo */
         Yc[4][i]=Yc[3][i]; /* Copia os valores das correntes dos cap. iniciais para os slots extras no tempo */
         Ys[5][i]=Ys[3][i]; /* Copia os valores iniciais para os slots extras no tempo */
@@ -747,19 +830,19 @@ Yn[0][nv+1]=0; /* Esse desgraçado estava gerando UM MILHÃO DE ERROS !!! */
       }
       save=1;
     }
-   //printf("Saves:\n");
-   // for (i=0; i<=6; i++) { /* deixei essa rotina por precaução, para não ter valores indefinidos na matriz de saves */
-   //   printf("\n saveC%i",i);
-   //   for (j=0; j<=nv; j++){
-   //     if ( tipo == 'C' ){
-   //      /* printf(" %s %g\n ",lista[j],Ys[i][j]); */ /* printa a matriz de saves - debug */
-   //        printf(" %i eh: %g ",j,Yc[i][j]); /* printa a matriz de saves - debug */
-   //     }
-   //   }
-   // }
+ //  printf("Saves:\n");
+ //   for (i=0; i<=6; i++) { /* deixei essa rotina por precaução, para não ter valores indefinidos na matriz de saves */
+ //     printf("\n saveC%i",i);
+ //     for (j=0; j<=nv; j++){
+ //       if ( tipo == 'C' ){
+ //         printf(" %s %g ",lista[j],Ys[i][j]); /* printa a matriz de saves - debug */
+ //       //  printf(" %i eh: %g ",i,Yc[i][j]); /* printa a matriz de saves - debug */
+ //       }
+ //     }
+ //   }
+ //   getch();
 timeA+=stepSize;
-save--;/* um cara problematico, ou não. Vai saber. Não não é */
-w++;/* WHILE demonstrativo para 4 iterações somente. Facilmente ajustado para as iterações necessárias do ADMO */
+save--;
 }
   getch();
   return 0;
