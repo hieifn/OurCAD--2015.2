@@ -35,8 +35,8 @@ Os nos podem ser nomes
 #define MAX_ELEM 50
 #define MAX_NOS 50
 #define TOLG 1e-9
-#define TOLG2 3e-20
-#define MAX_ERRO_NR 1e-29
+#define TOLG2 8e-11
+#define MAX_ERRO_NR 1e-9
 //#define DEBUG
 #define MAX_STEPS 4
 
@@ -50,17 +50,19 @@ typedef struct elemento { /* Elemento do netlist */
 elemento netlist[MAX_ELEM]; /* Netlist */
 
 int
+  debugme=0,
   tryAgain=1,
   RaphsonCount=0,
   repete=1,
+  intStepsCounter=0,
   goToNewton,
   useInicialConditions = 2,
   quant,
+  erroElevado=0,
   intSteps,
   order,
   save = 3, /* variavel para armazenamento  */
   icc = 0, /* Correntes capacitor */
-  ns,
   ne, /* Elementos */
   nv, /* Variaveis */
   nn, /* Nos */
@@ -97,8 +99,7 @@ double
 
 /* Resolucao de sistema de equacoes lineares.
    Metodo de Gauss-Jordan com condensacao pivotal */
-int resolversistema(void)
-{
+int resolversistema(void) {
   int i,j,l, a;
   double t, p;
 
@@ -107,15 +108,15 @@ int resolversistema(void)
     a=i;
     for (l=i; l<=nv; l++) {
       if (fabs(Yn[l][i])>fabs(t)) {
-	a=l;
-	t=Yn[l][i];
+	    a=l;
+	    t=Yn[l][i];
       }
     }
     if (i!=a) {
       for (l=1; l<=nv+1; l++) {
-	p=Yn[i][l];
-	Yn[i][l]=Yn[a][l];
-	Yn[a][l]=p;
+	    p=Yn[i][l];
+	    Yn[i][l]=Yn[a][l];
+	    Yn[a][l]=p;
       }
     }
     if (fabs(t)<TOLG) {
@@ -127,11 +128,12 @@ int resolversistema(void)
       p=Yn[i][j];
       if (p!=0)  /* Evita operacoes com zero */
         for (l=1; l<=nv; l++) {
-	  if (l!=i)
-	    Yn[l][j]-=Yn[l][i]*p;
+	      if (l!=i)
+	        Yn[l][j]-=Yn[l][i]*p;
         }
     }
   }
+  Yn[0][nv+1] = 0;
   return 0;
 }
 
@@ -157,10 +159,31 @@ int numero(char *nome)
   }
 }
 
-void AdamsMoltonL (int i, int save) /* ADMO do Indutor Completo! */
-{
-    if (save == 3){
-        if(useInicialConditions==1){netlist[i].ini = 0;}
+void zeraSistema (void) {
+  for (i=0; i<=nv; i++)
+    for (j=0; j<=nv+1; j++)
+      Yn[i][j]=0;
+}
+void Randomic (void) {
+	srand(time(NULL));
+	for (i=1; i<=nv; i++){
+	  NRCompare[i] = (double)(((rand()%1001)/10)-50);
+	}
+}
+
+int NewtonRapsonCompare (void) {
+  erroElevado=0;
+  for (i=1; i<=nv; i++){
+    if ( (fabs(Yn[i][nv+1] - NRCompare[i])) > MAX_ERRO_NR ) {
+      erroElevado=1;
+      }
+  }
+     if (erroElevado==1) return 0; /*Girando mundão que não tá legal */
+     else return 1; /*Tá traquilo tá favorável*/
+
+}
+void AdamsMoltonL (int i, int save) { /* ADMO do Indutor Completo! */
+    if (save == 3){ /* Analise inicial */
         z=(netlist[i].ini*(netlist[i].valor/iStepSize));
         g=netlist[i].valor/iStepSize;
     }
@@ -169,29 +192,41 @@ void AdamsMoltonL (int i, int save) /* ADMO do Indutor Completo! */
         g=(netlist[i].valor/stepSize);
     }
     else if (order == 2){/* PERFEITO */
-        z=((((2.0*netlist[i].valor)/stepSize)*(Ys[save+1][netlist[i].x]))+(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b]));
+        z=((((2.0*netlist[i].valor)/stepSize)*(Ys[save+1][netlist[i].x]))
+           +(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b]));
         g=((2.0*netlist[i].valor)/stepSize);
      //   printf("z: %g g: %g\n ",z,g);
      //   getch();
     }
-    else if (order == 3){ /* PERFEITO */
-        z=( ((12.0/5.0)*((Ys[save+1][netlist[i].x])*((netlist[i].valor)/(stepSize)))) + ((8.0/5.0)*(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])) - ((1.0/5.0)*(Ys[save+2][netlist[i].a]-Ys[save+2][netlist[i].b])));
+    else if (order == 3){ /* DefEITO */
+        z=( ((12.0/5.0)*((Ys[save+1][netlist[i].x])*((netlist[i].valor)/(stepSize))))
+           +((8.0/5.0)*(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b]))
+           -((1.0/5.0)*(Ys[save+2][netlist[i].a]-Ys[save+2][netlist[i].b])));
         g=((12.0/5.0)*((netlist[i].valor)/stepSize));
       //  printf("z: %g g: %g",z,g);
       //  getch();
     }
     else if (order == 4){ /* Perfeito */
-        z=((((Ys[save+1][netlist[i].x])*((netlist[i].valor)/stepSize))*(24.0000/9.0000))+((19.0000/9.0000)*(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b]))-((5.0000/9.0000)*(Ys[save+2][netlist[i].a]-Ys[save+2][netlist[i].b]))+((1.0000/9.0000)*(Ys[save+3][netlist[i].a]-Ys[save+3][netlist[i].b])));
-        g=((24.0000/9.0000)*((netlist[i].valor)/stepSize));
+        z=((((Ys[save+1][netlist[i].x])*((netlist[i].valor)/stepSize))*(24.0/9.0))
+           +((19.0/9.0)*(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b]))
+           -((5.0/9.0)*(Ys[save+2][netlist[i].a]-Ys[save+2][netlist[i].b]))
+           +((1.0/9.0)*(Ys[save+3][netlist[i].a]-Ys[save+3][netlist[i].b])));
+        g=((24.0/9.0)*((netlist[i].valor)/stepSize));
      //   printf("z: %g g: %g\n ",z,g);
      //   getch();
     }
 }
 
-void AdamsMoltonC (int i, int save)
-{
+/* Copia o valor da solucao de Yn para o vetor NRcompare, para Newton-raphson */
+void SolutionRaphson (void) {
+  int i;
+  for (i=0; i<=nv; i++)
+  	NRCompare[i] = Yn[i][nv+1];
+}
+
+void AdamsMoltonC (int i, int save){
+
     if (save == 3){
-        if(useInicialConditions==1){netlist[i].ini = 0;}   /* iStpeSize - StepSize inicial para começar a analise */
         z=(netlist[i].ini*(netlist[i].valor/iStepSize)); /* iStpeSize - StepSize inicial para começar a analise */
         g=((netlist[i].valor)/(iStepSize));
 
@@ -201,22 +236,258 @@ void AdamsMoltonC (int i, int save)
         g=((netlist[i].valor)/(stepSize));
     }
     else if (order == 2){ /* PERFEITO */
-        z=(((Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])*((2.0*netlist[i].valor)/stepSize))+Yc[save+1][netlist[i].x]);
+        z=(((Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])*((2.0*netlist[i].valor)/stepSize))
+           +Yc[save+1][netlist[i].x]);
         g=(2.0*(netlist[i].valor)/(stepSize));
     //    printf("z :%g g: %g\n",z,g);
     //    getch();
     }
     else if (order == 3){ /* PERFEITO */
-        z=(((Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])*(((12.0/5.0)*netlist[i].valor)/stepSize))+ ((8.0/5.0)*Yc[save+1][netlist[i].x]) - ((1.0/5.0)*Yc[save+2][netlist[i].x])  );
+        z=(((Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])*(((12.0/5.0)*netlist[i].valor)/stepSize))
+           +((8.0/5.0)*Yc[save+1][netlist[i].x])
+           -((1.0/5.0)*Yc[save+2][netlist[i].x]));
         g=((12.0/5.0)*((netlist[i].valor)/(stepSize)));
 //        printf("save0: %g save2: %g save3: %g\n",(Yc[save+1][netlist[i].x]),Yc[save+2][netlist[i].x],Yc[save+3][netlist[i].x]);
 //        getch();
     }
-    else if (order == 4){ /* ERRO NA ESTAMPA, PROVAVELMENTE SINAL */
-        z=(  ((Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])*((24.0000/9.0000)*((netlist[i].valor)/(stepSize)))) + ((19.0000/9.0000)*Yc[save+1][netlist[i].x]) - ((5.0000/9.0000)*Yc[save+2][netlist[i].x]) + ((1.0000/9.0000)*Yc[save+3][netlist[i].x]));
-        g=((24.0000/9.0000)*((netlist[i].valor)/(stepSize)));
+    else if (order == 4){ /* Perfeito */
+        z=( ((Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])*((24.0/9.0)*((netlist[i].valor)/(stepSize))))
+           +((19.0/9.0)*Yc[save+1][netlist[i].x])
+           -((5.0/9.0)*Yc[save+2][netlist[i].x])
+           +((1.0/9.0)*Yc[save+3][netlist[i].x]));
+        g=((24.0/9.0)*((netlist[i].valor)/(stepSize)));
  //       printf("save0: %g save2: %g save3: %g\n",(Yc[save+1][netlist[i].x]),Yc[save+2][netlist[i].x],Yc[save+3][netlist[i].x]);
  //       getch();
+    }
+}
+
+void CorrenteC (int save){
+
+     for(i=1 ; i<=ne ; i++){ /* rotina que salva as correntes do capacitor na matriz Yc */
+        tipo=netlist[i].nome[0];
+        if (tipo=='C'){
+          if(save==3){
+            Yc[save][netlist[i].x]=(((netlist[i].valor)/iStepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])-(netlist[i].ini)));
+          }
+          else if (order == 1){
+            Yc[save][netlist[i].x]=(((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])
+                                                                   -(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])));
+          }
+          else if (order == 2){
+            Yc[save][netlist[i].x]=( 2.0*((netlist[i].valor)/stepSize)*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])
+                                                                        -(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b]))
+                                                                        -Yc[save+1][netlist[i].x]);
+          }
+          else if (order == 3){
+            Yc[save][netlist[i].x]=(  ( ((12.0/5.0)*((netlist[i].valor)/stepSize) )*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])
+                                                                                     -(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])))
+                                                                                     -((8.0/5.0)*Yc[save+1][netlist[i].x])
+                                                                                     +((1.0/5.0)*Yc[save+2][netlist[i].x]));
+          }
+          else if (order == 4){ /* Pode ter merda aqui também. */
+            Yc[save][netlist[i].x]=( ( ((24.0/9.0)*((netlist[i].valor)/stepSize) )*((Yn[netlist[i].a][nv+1]-Yn[netlist[i].b][nv+1])
+                                                                                    -(Ys[save+1][netlist[i].a]-Ys[save+1][netlist[i].b])))
+                                                                                    -((19.0/9.0)*Yc[save+1][netlist[i].x])
+                                                                                    +((5.0/9.0)*Yc[save+2][netlist[i].x])
+                                                                                    -((1.0/9.0)*Yc[save+3][netlist[i].x]));
+       //     printf("%g\n",Yc[save][netlist[i].x]);
+       //     getch();
+          }
+        }
+      }
+}
+
+void montaEstampas (void){
+  zeraSistema();
+  /* Monta estampas */
+  for (i=1; i<=ne; i++) {
+    tipo=netlist[i].nome[0];
+    if(tipo=='L'){
+        AdamsMoltonL(i,save);
+        Yn[netlist[i].a][netlist[i].x]+=1;
+        Yn[netlist[i].b][netlist[i].x]-=1;
+        Yn[netlist[i].x][netlist[i].a]-=1;
+        Yn[netlist[i].x][netlist[i].b]+=1;
+        Yn[netlist[i].x][netlist[i].x]+=g;
+        Yn[netlist[i].x][nv+1]+=z;          /* Fonte de corrente sendo Adicionada */
+    }
+    else if(tipo=='C'){
+      AdamsMoltonC(i,save);
+      Yn[netlist[i].a][netlist[i].a]+=g;
+      Yn[netlist[i].b][netlist[i].b]+=g;
+      Yn[netlist[i].a][netlist[i].b]-=g;
+      Yn[netlist[i].b][netlist[i].a]-=g;
+      Yn[netlist[i].a][nv+1]+=z; /* DETALHE PARA O SINAL Fonte de corrente sendo Adicionada */
+      Yn[netlist[i].b][nv+1]-=z; /* DETALHE PARA O SINAL Fonte de corrente sendo Adicionada */
+     }
+    else if (tipo=='R') {
+      g=1/netlist[i].valor;
+      Yn[netlist[i].a][netlist[i].a]+=g;
+      Yn[netlist[i].b][netlist[i].b]+=g;
+      Yn[netlist[i].a][netlist[i].b]-=g;
+      Yn[netlist[i].b][netlist[i].a]-=g;
+    }
+    else if (tipo=='G') {
+      g=netlist[i].valor;
+      Yn[netlist[i].a][netlist[i].c]+=g;
+      Yn[netlist[i].b][netlist[i].d]+=g;
+      Yn[netlist[i].a][netlist[i].d]-=g;
+      Yn[netlist[i].b][netlist[i].c]-=g;
+    }
+    else if (tipo=='I') {
+      g=netlist[i].valor;
+      Yn[netlist[i].a][nv+1]-=g;
+      Yn[netlist[i].b][nv+1]+=g;
+    }
+    else if (tipo=='V') {
+      Yn[netlist[i].a][netlist[i].x]+=1;
+      Yn[netlist[i].b][netlist[i].x]-=1;
+      Yn[netlist[i].x][netlist[i].a]-=1;
+      Yn[netlist[i].x][netlist[i].b]+=1;
+
+
+      if ((strcmp(netlist[i].type,"DC"))==0){
+        Yn[netlist[i].x][nv+1]-=netlist[i].valor;
+      }
+
+      else if ((strcmp(netlist[i].type,"SIN"))==0){
+
+            if (timeA<netlist[i].param3){
+                Yn[netlist[i].x][nv+1]-= (  netlist[i].valor +  netlist[i].param1 *
+                        sin((M_PI/180.0)*netlist[i].param5));
+            }
+
+            else if (timeA > (netlist[i].param3 + (netlist[i].param6)*(1/netlist[i].param2)) ) {
+                Yn[netlist[i].x][nv+1]-= (  netlist[i].valor +  netlist[i].param1 * exp(-netlist[i].param4*(netlist[i].param6/netlist[i].param2)) *
+                        sin( ((2.0* M_PI * netlist[i].param2) * (netlist[i].param6/netlist[i].param2)) + (M_PI/180.0)*netlist[i].param5 ));
+
+            }
+
+            else{
+                Yn[netlist[i].x][nv+1]-= (  netlist[i].valor +  netlist[i].param1 * exp(-netlist[i].param4*(timeA-netlist[i].param3)) *
+                        sin( ((2.0* M_PI * netlist[i].param2) * (timeA-netlist[i].param3)) + (M_PI/180.0)*netlist[i].param5 ));
+            }}
+
+      else if ((strcmp(netlist[i].type,"PULSE"))==0){
+
+        pulseRealTime=timeA-netlist[i].param2;
+        pulseRealTime= fmod(pulseRealTime,netlist[i].param6);
+        pulseOffTime=netlist[i].param6- (netlist[i].param3+netlist[i].param4+netlist[i].param5);
+        if (timeA<netlist[i].param2){
+            Yn[netlist[i].x][nv+1]-=netlist[i].valor;
+        }
+
+        else if (timeA> (netlist[i].param2 +(netlist[i].param7*netlist[i].param6) ) ) {
+            Yn[netlist[i].x][nv+1]-=netlist[i].valor;
+        }
+            else {
+                        if (pulseRealTime<netlist[i].param3 ){ /* subindo*/
+                            Yn[netlist[i].x][nv+1]-=((((netlist[i].param1-netlist[i].valor)/netlist[i].param3)*pulseRealTime)+ netlist[i].valor);
+                        }
+                        else if (pulseRealTime< (netlist[i].param3+netlist[i].param5)){
+                            Yn[netlist[i].x][nv+1]-=netlist[i].param1;
+                        }
+                        else if (pulseRealTime< (netlist[i].param3+netlist[i].param5+netlist[i].param4)){
+                            Yn[netlist[i].x][nv+1]-= (netlist[i].param1-
+                                                     (((netlist[i].param1-netlist[i].valor)/netlist[i].param4)*
+                                                     (pulseRealTime-(netlist[i].param3+netlist[i].param5))));
+                            }
+                        else {
+                            Yn[netlist[i].x][nv+1]-=netlist[i].valor;
+                        }
+
+            }
+        }
+      }
+    else if (tipo=='E') {
+      g=netlist[i].valor;
+      Yn[netlist[i].a][netlist[i].x]+=1;
+      Yn[netlist[i].b][netlist[i].x]-=1;
+      Yn[netlist[i].x][netlist[i].a]-=1;
+      Yn[netlist[i].x][netlist[i].b]+=1;
+      Yn[netlist[i].x][netlist[i].c]+=g;
+      Yn[netlist[i].x][netlist[i].d]-=g;
+    }
+    else if (tipo=='F') {
+      g=netlist[i].valor;
+      Yn[netlist[i].a][netlist[i].x]+=g;
+      Yn[netlist[i].b][netlist[i].x]-=g;
+      Yn[netlist[i].c][netlist[i].x]+=1;
+      Yn[netlist[i].d][netlist[i].x]-=1;
+      Yn[netlist[i].x][netlist[i].c]-=1;
+      Yn[netlist[i].x][netlist[i].d]+=1;
+    }
+    else if (tipo=='H') {
+      g=netlist[i].valor;
+      Yn[netlist[i].a][netlist[i].y]+=1;
+      Yn[netlist[i].b][netlist[i].y]-=1;
+      Yn[netlist[i].c][netlist[i].x]+=1;
+      Yn[netlist[i].d][netlist[i].x]-=1;
+      Yn[netlist[i].y][netlist[i].a]-=1;
+      Yn[netlist[i].y][netlist[i].b]+=1;
+      Yn[netlist[i].x][netlist[i].c]-=1;
+      Yn[netlist[i].x][netlist[i].d]+=1;
+      Yn[netlist[i].y][netlist[i].x]+=g;
+    }
+    else if (tipo=='N') {
+        //       printf("tensao em cima dele %g \n", NRCompare[netlist[i].a]-NRCompare[netlist[i].b]);
+            if ( (NRCompare[netlist[i].a] - NRCompare[netlist[i].b]) < netlist[i].param3 ){
+               g=((netlist[i].param4 - netlist[i].param2) / (netlist[i].param3-netlist[i].param1));
+               z=(netlist[i].param4 - g*netlist[i].param3);
+            }
+                //((NRCompare[netlist[i].a] - NRCompare[netlist[i].b]) >= netlist[i].param3) &&
+            else if ( ((NRCompare[netlist[i].a]-NRCompare[netlist[i].b]) < netlist[i].param5) ){
+
+                g=(netlist[i].param6 - netlist[i].param4) / (netlist[i].param5 - netlist[i].param3);
+                z=(netlist[i].param6 - g*netlist[i].param5);
+            }
+            //((NRCompare[netlist[i].a]-NRCompare[netlist[i].b]) >= netlist[i].param5)
+            else {
+                g=(netlist[i].valor - netlist[i].param6) / (netlist[i].param7 - netlist[i].param5);
+                z=(netlist[i].valor - g*netlist[i].param7);
+            }
+            Yn[netlist[i].a][netlist[i].a]+=g;
+            Yn[netlist[i].b][netlist[i].b]+=g;
+            Yn[netlist[i].a][netlist[i].b]-=g;
+            Yn[netlist[i].b][netlist[i].a]-=g;
+            Yn[netlist[i].a][nv+1]-=z;
+            Yn[netlist[i].b][nv+1]+=z;
+           // getch();
+    }
+    else if (tipo=='$') {
+            if ((NRCompare[netlist[i].c]-NRCompare[netlist[i].d])<netlist[i].param3){
+              Yn[netlist[i].a][netlist[i].a]+=netlist[i].param2;
+              Yn[netlist[i].b][netlist[i].b]+=netlist[i].param2;
+              Yn[netlist[i].a][netlist[i].b]-=netlist[i].param2;
+              Yn[netlist[i].b][netlist[i].a]-=netlist[i].param2;
+            }
+            else {
+              Yn[netlist[i].a][netlist[i].a]+=netlist[i].param1;
+              Yn[netlist[i].b][netlist[i].b]+=netlist[i].param1;
+              Yn[netlist[i].a][netlist[i].b]-=netlist[i].param1;
+              Yn[netlist[i].b][netlist[i].a]-=netlist[i].param1;
+            }
+    }
+    else if (tipo=='O') {
+      Yn[netlist[i].a][netlist[i].x]+=1;
+      Yn[netlist[i].b][netlist[i].x]-=1;
+      Yn[netlist[i].x][netlist[i].c]+=1;
+      Yn[netlist[i].x][netlist[i].d]-=1;
+    }
+                                                                     #ifdef DEBUG
+                                                                     if (debugme==1){
+                                                                        /* Opcional: Mostra o sistema apos a montagem da estampa */
+                                                                        printf("Sistema apos a estampa de %s\n",netlist[i].nome);
+                                                                        for (k=1; k<=nv; k++) {
+                                                                          for (j=1; j<=nv+1; j++)
+                                                                            if (Yn[k][j]!=0) printf("%+3.1f ",Yn[k][j]);
+                                                                            else printf(" ... ");
+                                                                          printf("\n");
+                                                                        }
+                                                                        getch();
+                                                                        }
+                                                                    #endif
+
     }
 }
 
@@ -225,8 +496,9 @@ int main(void)
   system("cls");
   srand( (unsigned)time(NULL) );
   printf("Programa de analise no tempo, pelo metodo de Adams-Molton\n");
-  printf("Desenvolvido por : Igor F. Nascimento, Eduardo Naslausky e Alan Carpilovsky\n"); /*Galera troquem deoois !*/
-  printf("Versao %d\n",rand());
+  printf("UFRJ- Departamento de Engenharia Eletronica\n");
+  printf("Desenvolvido por : Igor F. Nascimento, Eduardo Naslausky e Alan Carpilovsky\n");
+  printf("Versao %d .j\n",rand());
   //printf("Versao %s\n",versao);
  denovo:
   /* Leitura do netlist */
@@ -252,6 +524,7 @@ int main(void)
     sscanf(txt,"%10s",netlist[ne].nome);
     p=txt+strlen(netlist[ne].nome); /* Inicio dos parametros */
     /* O que e lido depende do tipo */
+    /* Le e determina o tipo da analise */
     if (tipo=='.'){
       if ((quant=sscanf(p,"%lg%lg%6s%i%4s",&finalTime,&stepSize,method,&intSteps,uic))!=5){
         useInicialConditions = 1; /* 1 = Não usar Condições Iniciais ; 2 = Usar Condições Iniciais */
@@ -259,13 +532,14 @@ int main(void)
     printf("%lg %lg %s %i %s %i\n",finalTime,stepSize,method,intSteps,uic,quant);/* Debug - Igor */
     order=atoi(method+4); /* Tem que ser o 4 pq o 5 é o endOfString ADMO"N"  */
     ne--;
+    stepSize=stepSize/intSteps; //Diminuir o passo com base no numero de passos internos
     }
     else if (tipo=='$'){
       sscanf(p,"%10s%10s%10s%10s%lg%lg%lg",na,nb,nc,nd,
                                             &netlist[ne].param1,
                                             &netlist[ne].param2,
                                             &netlist[ne].param3);
-        printf("%s %s controle1:%s controle2:%s %g\n",netlist[ne].nome,na,nb,netlist[ne].valor);
+        printf("%s %s %s cntrl1:%s cntrl2:%s \n",netlist[ne].nome,na,nb,nc,nd);
         netlist[ne].a=numero(na);
         netlist[ne].b=numero(nb);
         netlist[ne].c=numero(nc);
@@ -281,14 +555,6 @@ int main(void)
                                             &netlist[ne].param6,
                                             &netlist[ne].param7,
                                             &netlist[ne].valor);
-
-      netlist[ne].i1 =((((netlist[ne].param4-netlist[ne].param2)/(netlist[ne].param3-netlist[ne].param1))*-netlist[ne].param1)+netlist[ne].param2);
-      netlist[ne].g1 =((netlist[ne].param4-netlist[ne].param2)/(netlist[ne].param3-netlist[ne].param1));
-      netlist[ne].i2 =((((netlist[ne].param6-netlist[ne].param4)/(netlist[ne].param5-netlist[ne].param3))*-netlist[ne].param3)+netlist[ne].param4);
-      netlist[ne].g2 =((netlist[ne].param6-netlist[ne].param4)/(netlist[ne].param5-netlist[ne].param3));
-      netlist[ne].i3 =((((netlist[ne].valor-netlist[ne].param6)/(netlist[ne].param7-netlist[ne].param5))*-netlist[ne].param5)+netlist[ne].param6);
-      netlist[ne].g3 =((netlist[ne].valor-netlist[ne].param6)/(netlist[ne].param7-netlist[ne].param5));
-
       netlist[ne].a=numero(na);
       netlist[ne].b=numero(nb);
       printf("%s %s %s P1<%g,%g> P2<%g,%g> P3<%g,%g> P4<%g,%g>\n ",netlist[ne].nome,na,nb,netlist[ne].param1,netlist[ne].param2,netlist[ne].param3,netlist[ne].param4,netlist[ne].param5,netlist[ne].param6,netlist[ne].param7,netlist[ne].valor);
@@ -423,7 +689,129 @@ int main(void)
   }
   getch();
   /* Monta o sistema nodal modificado */
-	printf("Leio e copio");
+
+  printf("O circuito tem %d nos, %d variaveis e %d elementos\n",nn,nv,ne);
+  getch();
+
+  arquivo=fopen("output.tab", "w");
+
+  fprintf (arquivo, "t ");
+
+  for (i=1;i<=nv; i++){
+    fprintf(arquivo, "%s ", lista[i]);
+  }
+  fprintf (arquivo, "\n");
+  fclose(arquivo);
+
+
+
+  while(timeA<finalTime){ /* While para analise no tempo.*/
+
+  zeraSistema();
+  RaphsonCount = 0;
+  tryAgain=0;
+
+  do {
+    SolutionRaphson();
+            if (RaphsonCount > 10){
+              Randomic();
+              RaphsonCount=0;
+              tryAgain++;
+              if (tryAgain == 5){
+                printf("Sistema sem solucao");
+                exit(1);
+              }
+            }
+    montaEstampas(); /* Usa B.E para Cond. Iniciais */
+    resolversistema();
+    RaphsonCount++;
+  } while (NewtonRapsonCompare() == 0);
+
+                                                                    #ifdef DEBUG
+                                                                      /* Opcional: Mostra o sistema resolvido */
+                                                                      printf("Sistema resolvido:\n");
+                                                                      for (i=1; i<=nv; i++) {
+                                                                          for (j=1; j<=nv+1; j++)
+                                                                            if (Yn[i][j]!=0) printf("%+3.1f ",Yn[i][j]);
+                                                                            else printf(" ... ");
+                                                                          printf("\n");
+                                                                        }
+                                                                      getch();
+                                                                    #endif
+
+/* Zera a matriz de saves */
+  if(save==3){
+    for (i=0; i<=5; i++) { /* deixei essa rotina por precaução, para não ter valores indefinidos na matriz de saves */
+      for (j=0; j<=nv+1; j++){ /* zera também a matriz que salva as correntes do capacitor. */
+        Ys[i][j]=0;
+        Yc[i][j]=0;
+      }
+    }
+  }
+  for (i=1; i<=nv; i++){
+    Ys[save][i]=Yn[i][nv+1]; /* Aproveitei que ele já estava listando tudo e copio o valor para a matriz Ys */
+  }
+    CorrenteC(save);/* Calcula as correntes nos capacitores e salva na matriz Yc */
+
+  /* Mostra solucao e salva tensões na matriz de saves */
+  #ifdef DEBUG
+  printf("Solucao:\n");
+  #endif // DEBUG
+
+  /* Rotina Para extender as condições iniciais para t(-1) e t(-2) Ys e Yc para para o caso INICIAL ; PODE JUNTAR ESSA ROTINA NO FOR ACIMA*/
+    if (save==3){
+      for (i=1; i<=nv; i++) {
+        Ys[4][i]=Ys[3][i]; /* Copia os valores iniciais para os slots extras no tempo */
+        Yc[4][i]=Yc[3][i]; /* Copia os valores das correntes dos cap. iniciais para os slots extras no tempo */
+        Ys[5][i]=Ys[3][i]; /* Copia os valores iniciais para os slots extras no tempo */
+        Yc[5][i]=Yc[3][i]; /* Copia os valores das correntes dos cap. iniciais para os slots extras no tempo */
+      }
+    }
+    if (save == 0){ /* rotina que da shift nos valores de Yc e Ys; PODE JUNTAR ESSA ROTINA EM UM FOR ACIMA !*/
+      for (i=1; i<=nv;i++){
+        Ys[3][i]=Ys[2][i];
+        Yc[3][i]=Yc[2][i];
+        Ys[2][i]=Ys[1][i];
+        Yc[2][i]=Yc[1][i];
+        Ys[1][i]=Ys[0][i];
+        Yc[1][i]=Yc[0][i];
+      }
+      save=1;
+
+    }
+  strcpy(txt,"Tensao");
+  if (intStepsCounter%intSteps==0){
+                  arquivo=fopen ("output.tab","a");
+                  fprintf(arquivo, "%g ",timeA);
+                  for (i=1; i<=nv; i++){
+                    if (i==nn+1){
+                      strcpy(txt,"Corrente");
+                    }
+
+                    #ifdef DEBUG
+                    printf("%s %s: %g\n",txt,lista[i],Yn[i][nv+1]);
+                    #endif // DEBUG
+                    fprintf(arquivo, "%g ",Yn[i][nv+1]);
+                  }
+                  fprintf (arquivo, "\n");
+                  fclose (arquivo);
+  }
+ //  printf("Saves:\n");
+ //   for (i=0; i<=6; i++) { /* deixei essa rotina por precaução, para não ter valores indefinidos na matriz de saves */
+ //     printf("\n saveC%i",i);
+ //     for (j=0; j<=nv; j++){
+ //       if ( tipo == 'C' ){
+ //         printf(" %s %g ",lista[j],Ys[i][j]); /* printa a matriz de saves - debug */
+ //       //  printf(" %i eh: %g ",i,Yc[i][j]); /* printa a matriz de saves - debug */
+ //       }
+ //     }
+ //   }
+ //   getch();
+timeA+=stepSize;
+intStepsCounter++;
+save--;
+}
+  printf("Analise concluida: Pressione qualquer tecla para continuar \n");
   getch();
   return 0;
 }
